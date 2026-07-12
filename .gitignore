@@ -1,0 +1,40 @@
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Frontend (Next.js)
+node_modules/
+.next/
+out/
+build/
+.env*.local
+
+# Backend (Python / FastAPI)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.env
+n8n_dashboard_env/
+# Operating System Files
+.DS_Store
+Thumbs.db
+
+# Frontend (Next.js)
+node_modules/
+.next/
+out/
+build/
+.env*.local
+
+# Backend (Python / FastAPI)
+__pycache__/
+*.pyc
+*.pyo
+*.pyd
+.pytest_cache/
+.env
+n8n_dashboard_env/
+
+
