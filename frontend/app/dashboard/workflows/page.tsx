@@ -3,6 +3,7 @@
 import React, { useEffect, useState, Suspense } from "react";
 import { useSearchParams, useRouter } from "next/navigation";
 import { automationService, PostAutomation, VisualNode, VisualEdge } from "@/services/automation";
+import apiClient from "@/services/api";
 
 function BuilderContent() {
   const searchParams = useSearchParams();
@@ -30,6 +31,23 @@ function BuilderContent() {
 
   const [statusMessage, setStatusMessage] = useState("");
   const [outputLogs, setOutputLogs] = useState("");
+  const [workflowName, setWorkflowName] = useState("My Automation Workflow");
+  const [postsList, setPostsList] = useState<any[]>([]);
+  const [selectedPostId, setSelectedPostId] = useState("");
+  const [applyToAll, setApplyToAll] = useState(true);
+
+  // Fetch posts dynamically when activePlatform changes
+  useEffect(() => {
+    const fetchPosts = async () => {
+      try {
+        const res = await apiClient.get("/posts", { params: { platform: activePlatform } });
+        setPostsList(res.data);
+      } catch (e) {
+        console.error(e);
+      }
+    };
+    fetchPosts();
+  }, [activePlatform]);
 
   const loadAutomations = async () => {
     try {
@@ -74,6 +92,7 @@ function BuilderContent() {
     setActivePermalink(auto.permalink);
     setActivePlatform(auto.platform);
     setActiveCaption(auto.post_caption || "");
+    setWorkflowName(auto.post_caption || "My Automation Workflow");
     setActiveThumbnail(auto.post_thumbnail || "");
     setNodes(auto.visual_graph.nodes || []);
     setSelectedNodeIndex(auto.visual_graph.nodes.length > 0 ? 0 : null);
@@ -85,6 +104,9 @@ function BuilderContent() {
     setActivePermalink("https://instagram.com/p/manual");
     setActivePlatform("instagram");
     setActiveCaption("Workspace Custom Flow Draft");
+    setWorkflowName("My Automation Workflow");
+    setSelectedPostId(""); // <-- Clear specific post
+    setApplyToAll(true);   // <-- Default to all posts scope
     setActiveThumbnail("https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=300&q=80");
     setNodes([
       { id: "1", type: "incoming_event", data: { event: "new_comment", platform: "instagram" } },
@@ -93,6 +115,7 @@ function BuilderContent() {
     ]);
     setSelectedNodeIndex(0);
   };
+
 
   const handleUpdateNodeData = (key: string, value: any) => {
     if (selectedNodeIndex === null) return;
@@ -105,7 +128,7 @@ function BuilderContent() {
     );
   };
 
-  const handleAddBlock = (type: "if_condition" | "send_request" | "store_value" | "delay" | "loop" | "switch" | "ai_action") => {
+  const handleAddBlock = (type: "if_condition" | "send_request" | "store_value" | "delay" | "loop" | "switch" | "ai_action" | "generic_api" | "custom_script") => {
     const newId = String(Date.now());
     let defaultData = {};
     if (type === "if_condition") defaultData = { operator: "contains", keyword: "" };
@@ -115,6 +138,9 @@ function BuilderContent() {
     if (type === "loop") defaultData = { batch_size: 1 };
     if (type === "switch") defaultData = { rules: [{ value: "support" }] };
     if (type === "ai_action") defaultData = { prompt: "" };
+    if (type === "generic_api") defaultData = { url: "", method: "GET", body: "{}", headers: [] };
+    if (type === "custom_script") defaultData = { code: "return items;" };
+
 
     const newBlock: VisualNode = { id: newId, type, data: defaultData };
     setNodes((prev) => [...prev, newBlock]);
@@ -131,6 +157,7 @@ function BuilderContent() {
     setSelectedNodeIndex(0);
   };
 
+
   const handleSave = async () => {
     const edges: VisualEdge[] = [];
     for (let i = 0; i < nodes.length - 1; i++) {
@@ -141,13 +168,14 @@ function BuilderContent() {
     }
 
     const payload: PostAutomation = {
-      post_id: activePostId,
+      post_id: applyToAll ? "all_posts" : selectedPostId, // <-- Target Scoping
       permalink: activePermalink,
       platform: activePlatform,
       post_thumbnail: activeThumbnail,
-      post_caption: activeCaption,
+      post_caption: workflowName, // <-- Textbox Workflow Name
       visual_graph: { nodes, edges }
     };
+
 
     try {
       if (selectedId) {
@@ -164,22 +192,42 @@ function BuilderContent() {
     }
   };
 
-  const handlePublish = async () => {
+  const handlePublish = async (activate = true) => {
     if (!selectedId) {
       setStatusMessage("Please save this automation before publishing.");
       return;
     }
     setOutputLogs("Publishing to n8n runtime API...");
     try {
-      const res = await automationService.publishAutomation(selectedId);
-      setOutputLogs(JSON.stringify(res, null, 2));
-      setStatusMessage("Successfully published and activated workflow inside n8n!");
+      const res = await apiClient.post(`/automations/${selectedId}/publish`, null, {
+        params: { activate }
+      });
+      setOutputLogs(JSON.stringify(res.data, null, 2));
+      setStatusMessage(
+        activate
+          ? "Successfully published and activated workflow inside n8n!"
+          : "Successfully sent workflow draft to n8n!"
+      );
       loadAutomations();
     } catch (e: any) {
       setOutputLogs(e.message || "Failed publishing to n8n");
       setStatusMessage("Failed to publish workflow. Check logs.");
     }
   };
+
+  const handleExecute = async () => {
+    if (!selectedId) return;
+    setOutputLogs("Triggering workflow execution run in n8n...");
+    try {
+      const res = await apiClient.post(`/automations/${selectedId}/execute`);
+      setOutputLogs(JSON.stringify(res.data, null, 2));
+      setStatusMessage("Workflow run executed successfully!");
+    } catch (e: any) {
+      setOutputLogs(e.message || "Execution run failed.");
+      setStatusMessage("Workflow execution failed. Check logs.");
+    }
+  };
+
 
   const activeNode = selectedNodeIndex !== null ? nodes[selectedNodeIndex] : null;
 
@@ -226,18 +274,63 @@ function BuilderContent() {
           </div>
         )}
 
-        <div className="bg-zinc-900/40 border border-zinc-800 p-5 rounded-2xl flex items-center justify-between gap-4">
-          <div className="flex items-center gap-4">
+        <div className="bg-zinc-900/40 border border-zinc-800 p-5 rounded-2xl flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="flex items-center gap-4 flex-1">
             {activeThumbnail && (
-              // eslint-disable-next-line @next/next/no-img-element
               <img src={activeThumbnail} alt="post" className="w-12 h-12 object-cover rounded-lg border border-zinc-800" />
             )}
-            <div>
-              <p className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">{activePlatform} Post</p>
-              <h3 className="text-sm font-semibold text-zinc-200 line-clamp-1">{activeCaption}</h3>
+            <div className="space-y-2 flex-1">
+              <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Workflow Configuration</span>
+              <input
+                type="text"
+                value={workflowName}
+                onChange={(e) => setWorkflowName(e.target.value)}
+                placeholder="Enter workflow name..."
+                className="w-full bg-zinc-950 border border-zinc-850 text-zinc-100 text-xs px-3 py-2 rounded-xl focus:outline-none font-semibold"
+              />
             </div>
           </div>
+
+          <div className="flex flex-wrap items-center gap-3">
+            {/* Platform Selector */}
+            <select
+              value={activePlatform}
+              onChange={(e) => setActivePlatform(e.target.value)}
+              className="bg-zinc-950 border border-zinc-850 text-zinc-300 text-xs px-3 py-2 rounded-xl focus:outline-none"
+            >
+              <option value="instagram">Instagram</option>
+              <option value="linkedin">LinkedIn</option>
+            </select>
+
+            {/* Apply to all check */}
+            <label className="flex items-center gap-2 text-xs text-zinc-400">
+              <input
+                type="checkbox"
+                checked={applyToAll}
+                onChange={(e) => setApplyToAll(e.target.checked)}
+                className="rounded border-zinc-800 bg-zinc-950 accent-indigo-600 h-4 w-4"
+              />
+              All Posts
+            </label>
+
+            {/* Target Post selector dropdown */}
+            {!applyToAll && (
+              <select
+                value={selectedPostId}
+                onChange={(e) => setSelectedPostId(e.target.value)}
+                className="bg-zinc-950 border border-zinc-850 text-zinc-300 text-xs px-3 py-2 rounded-xl focus:outline-none max-w-[200px]"
+              >
+                <option value="">Choose Post...</option>
+                {postsList.map((post) => (
+                  <option key={post.post_id} value={post.post_id}>
+                    {post.caption ? post.caption.substring(0, 30) + "..." : post.post_id}
+                  </option>
+                ))}
+              </select>
+            )}
+          </div>
         </div>
+
 
         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
           <div className="md:col-span-2 space-y-4">
@@ -265,6 +358,8 @@ function BuilderContent() {
                           {node.type === "send_request" && `THEN: ${node.data.action_type || "Reply"}`}
                           {node.type === "store_value" && `STORE: ${node.data.variable_name || "Value"}`}
                           {node.type === "delay" && `WAIT: ${node.data.duration || 5} ${node.data.unit || "minutes"}`}
+                          {node.type === "generic_api" && `CALL API: ${node.data.method || "GET"} ${node.data.url || ""}`}
+                          {node.type === "custom_script" && `RUN SCRIPT: JS`}
                         </h4>
                       </div>
                       <button
@@ -289,187 +384,243 @@ function BuilderContent() {
 
             <div className="flex gap-4">
               <button onClick={handleSave} className="px-5 py-2.5 bg-zinc-900 border border-zinc-800 rounded-xl text-xs font-semibold text-zinc-200 cursor-pointer">Save Layout</button>
-              <button onClick={handlePublish} className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl text-xs font-semibold text-white cursor-pointer">Publish & Activate</button>
-            </div>
-          </div>
-
-          <div className="md:col-span-1">
-            <div className="p-5 bg-zinc-900/60 border border-zinc-800 rounded-2xl min-h-[45vh] space-y-4">
-              <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Properties Panel</h3>
-              {activeNode ? (
-                <div className="space-y-4">
-                  {activeNode.type === "incoming_event" && (
-                    <div>
-                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Trigger Event</label>
-                      <select
-                        value={activeNode.data.event || "new_comment"}
-                        onChange={(e) => handleUpdateNodeData("event", e.target.value)}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
-                      >
-                        <option value="new_comment">New Comment</option>
-                        <option value="new_dm">New DM Message</option>
-                        <option value="mention">Mention in Post</option>
-                        <option value="story_reply">Story Reply</option>
-                      </select>
-                    </div>
-                  )}
-
-                  {activeNode.type === "if_condition" && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] text-zinc-500 font-bold block mb-1">Operator Rule</label>
-                        <select
-                          value={activeNode.data.operator || "contains"}
-                          onChange={(e) => handleUpdateNodeData("operator", e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
-                        >
-                          <option value="contains">Contains Keyword</option>
-                          <option value="equals">Equals Text</option>
-                          <option value="starts_with">Starts With</option>
-                          <option value="ends_with">Ends With</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-zinc-500 font-bold block mb-1">Matching Keyword</label>
-                        <input
-                          type="text"
-                          value={activeNode.data.keyword || ""}
-                          onChange={(e) => handleUpdateNodeData("keyword", e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {activeNode.type === "send_request" && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] text-zinc-500 font-bold block mb-1">Action Type</label>
-                        <select
-                          value={activeNode.data.action_type || "reply"}
-                          onChange={(e) => handleUpdateNodeData("action_type", e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
-                        >
-                          <option value="reply">Send Auto Reply</option>
-                          <option value="send_dm">Send Direct Message</option>
-                          <option value="hide_comment">Hide Comment</option>
-                          <option value="slack_notify">Send Slack Alert</option>
-                        </select>
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-zinc-500 font-bold block mb-1">Message Template</label>
-                        <textarea
-                          value={activeNode.data.text || ""}
-                          onChange={(e) => handleUpdateNodeData("text", e.target.value)}
-                          rows={4}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none resize-none font-sans"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {activeNode.type === "store_value" && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] text-zinc-500 font-bold block mb-1">Variable Name</label>
-                        <input
-                          type="text"
-                          value={activeNode.data.variable_name || "key"}
-                          onChange={(e) => handleUpdateNodeData("variable_name", e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-zinc-500 font-bold block mb-1">Store Value</label>
-                        <input
-                          type="text"
-                          value={activeNode.data.variable_value || ""}
-                          onChange={(e) => handleUpdateNodeData("variable_value", e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
-                        />
-                      </div>
-                    </div>
-                  )}
-
-                  {activeNode.type === "delay" && (
-                    <div className="space-y-3">
-                      <div>
-                        <label className="text-[10px] text-zinc-500 font-bold block mb-1">Delay Duration</label>
-                        <input
-                          type="number"
-                          value={activeNode.data.duration || 5}
-                          onChange={(e) => handleUpdateNodeData("duration", Number(e.target.value))}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
-                        />
-                      </div>
-                      <div>
-                        <label className="text-[10px] text-zinc-500 font-bold block mb-1">Time Unit</label>
-                        <select
-                          value={activeNode.data.unit || "minutes"}
-                          onChange={(e) => handleUpdateNodeData("unit", e.target.value)}
-                          className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
-                        >
-                          <option value="minutes">Minutes</option>
-                          <option value="hours">Hours</option>
-                          <option value="days">Days</option>
-                        </select>
-                      </div>
-                    </div>
-                  )}
-
-                  {activeNode.type === "loop" && (
-                    <div>
-                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Batch Loop Count</label>
-                      <input
-                        type="number"
-                        value={activeNode.data.batch_size || 1}
-                        onChange={(e) => handleUpdateNodeData("batch_size", Number(e.target.value))}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
-                      />
-                    </div>
-                  )}
-
-                  {activeNode.type === "switch" && (
-                    <div className="space-y-3">
-                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Switch Paths (Separated by Commas)</label>
-                      <input
-                        type="text"
-                        defaultValue={(activeNode.data.rules || []).map((r: any) => r.value).join(", ")}
-                        onChange={(e) => {
-                          const vals = e.target.value.split(",").map((v) => ({ value: v.trim() }));
-                          handleUpdateNodeData("rules", vals);
-                        }}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
-                      />
-                    </div>
-                  )}
-
-                  {activeNode.type === "ai_action" && (
-                    <div>
-                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">AI Prompt Instruction</label>
-                      <textarea
-                        value={activeNode.data.prompt || ""}
-                        onChange={(e) => handleUpdateNodeData("prompt", e.target.value)}
-                        rows={4}
-                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none resize-none font-sans"
-                      />
-                    </div>
-                  )}
-                </div>
-
-              ) : (
-                <p className="text-xs text-zinc-500">Select any block step to edit its rules.</p>
+              <button onClick={() => handlePublish(true)} className="px-5 py-2.5 bg-gradient-to-r from-indigo-500 to-purple-600 rounded-xl text-xs font-semibold text-white cursor-pointer">Publish & Activate</button>
+              <button onClick={() => handlePublish(false)} className="px-5 py-2.5 bg-zinc-800 border border-zinc-700 rounded-xl text-xs font-semibold text-zinc-300 hover:bg-zinc-750 cursor-pointer">Send to n8n (Draft)</button>
+              {selectedId && (
+                <button onClick={handleExecute} className="px-5 py-2.5 bg-emerald-600 hover:bg-emerald-700 rounded-xl text-xs font-semibold text-white cursor-pointer">Execute Workflow</button>
               )}
             </div>
           </div>
         </div>
 
-        <div className="bg-zinc-950 border border-zinc-800 p-5 rounded-2xl">
-          <label className="text-xs text-zinc-500 font-bold block mb-2 uppercase tracking-wider">Compile Output Terminal</label>
-          <pre className="text-zinc-400 font-mono text-[10px] overflow-auto max-h-40 whitespace-pre-wrap bg-zinc-900/30 p-3 rounded border border-zinc-850">
-            {outputLogs || "Ready."}
-          </pre>
+        <div className="md:col-span-1">
+          <div className="p-5 bg-zinc-900/60 border border-zinc-800 rounded-2xl min-h-[45vh] space-y-4">
+            <h3 className="text-xs font-bold text-zinc-400 uppercase tracking-wider">Properties Panel</h3>
+            {activeNode ? (
+              <div className="space-y-4">
+                {activeNode.type === "incoming_event" && (
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-bold block mb-1">Trigger Event</label>
+                    <select
+                      value={activeNode.data.event || "new_comment"}
+                      onChange={(e) => handleUpdateNodeData("event", e.target.value)}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                    >
+                      <option value="instagram_comment">Instagram Comment Trigger</option>
+                      <option value="instagram_dm">Instagram Direct Message (DM)</option>
+                      <option value="linkedin_comment">LinkedIn Comment Trigger</option>
+                      <option value="linkedin_share">LinkedIn Share Trigger</option>
+                      <option value="new_comment">New Comment Posted</option>
+                      <option value="new_dm">New Direct Message Received</option>
+                      <option value="mention">Mention in Post</option>
+                      <option value="story_reply">Story Reply or Mention</option>
+                      <option value="user_tagged">User Tagged in Media</option>
+                      <option value="timer_fired">Scheduled Timer Fired</option>
+                      <option value="webhook_generic">Generic Webhook Trigger</option>
+                    </select>
+
+                  </div>
+                )}
+
+                {activeNode.type === "if_condition" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Operator Rule</label>
+                      <select
+                        value={activeNode.data.operator || "contains"}
+                        onChange={(e) => handleUpdateNodeData("operator", e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      >
+                        <option value="contains">Contains Keyword</option>
+                        <option value="equals">Equals Text</option>
+                        <option value="starts_with">Starts With</option>
+                        <option value="ends_with">Ends With</option>
+                      </select>
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Matching Keyword</label>
+                      <input
+                        type="text"
+                        value={activeNode.data.keyword || ""}
+                        onChange={(e) => handleUpdateNodeData("keyword", e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {activeNode.type === "send_request" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Action Type</label>
+                      <select
+                        value={activeNode.data.action_type || "reply"}
+                        onChange={(e) => handleUpdateNodeData("action_type", e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      >
+                        <option value="reply">Reply to Comment</option>
+                        <option value="send_dm">Send Direct Message (DM)</option>
+                        <option value="generic_api">Generic HTTP Request</option>
+                        <option value="mcp_command">MCP Command Execution</option>
+                        <option value="hide_comment">Hide/Delete Comment</option>
+                        <option value="slack_notify">Send Slack Notification</option>
+                        <option value="whatsapp_dm">Send WhatsApp Message</option>
+                        <option value="jira_ticket">Create Jira Support Ticket</option>
+                      </select>
+
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Message Template</label>
+                      <textarea
+                        value={activeNode.data.text || ""}
+                        onChange={(e) => handleUpdateNodeData("text", e.target.value)}
+                        rows={4}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none resize-none font-sans"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {activeNode.type === "store_value" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Variable Name</label>
+                      <input
+                        type="text"
+                        value={activeNode.data.variable_name || "key"}
+                        onChange={(e) => handleUpdateNodeData("variable_name", e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Store Value</label>
+                      <input
+                        type="text"
+                        value={activeNode.data.variable_value || ""}
+                        onChange={(e) => handleUpdateNodeData("variable_value", e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      />
+                    </div>
+                  </div>
+                )}
+
+                {activeNode.type === "delay" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Delay Duration</label>
+                      <input
+                        type="number"
+                        value={activeNode.data.duration || 5}
+                        onChange={(e) => handleUpdateNodeData("duration", Number(e.target.value))}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Time Unit</label>
+                      <select
+                        value={activeNode.data.unit || "minutes"}
+                        onChange={(e) => handleUpdateNodeData("unit", e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      >
+                        <option value="minutes">Minutes</option>
+                        <option value="hours">Hours</option>
+                        <option value="days">Days</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {activeNode.type === "loop" && (
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-bold block mb-1">Batch Loop Count</label>
+                    <input
+                      type="number"
+                      value={activeNode.data.batch_size || 1}
+                      onChange={(e) => handleUpdateNodeData("batch_size", Number(e.target.value))}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {activeNode.type === "switch" && (
+                  <div className="space-y-3">
+                    <label className="text-[10px] text-zinc-500 font-bold block mb-1">Switch Paths (Separated by Commas)</label>
+                    <input
+                      type="text"
+                      defaultValue={(activeNode.data.rules || []).map((r: any) => r.value).join(", ")}
+                      onChange={(e) => {
+                        const vals = e.target.value.split(",").map((v) => ({ value: v.trim() }));
+                        handleUpdateNodeData("rules", vals);
+                      }}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                    />
+                  </div>
+                )}
+
+                {activeNode.type === "ai_action" && (
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-bold block mb-1">AI Prompt Instruction</label>
+                    <textarea
+                      value={activeNode.data.prompt || ""}
+                      onChange={(e) => handleUpdateNodeData("prompt", e.target.value)}
+                      rows={4}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none resize-none font-sans"
+                    />
+                  </div>
+                )}
+
+                {activeNode.type === "generic_api" && (
+                  <div className="space-y-3">
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Request URL</label>
+                      <input
+                        type="text"
+                        value={activeNode.data.url || ""}
+                        onChange={(e) => handleUpdateNodeData("url", e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      />
+                    </div>
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">HTTP Method</label>
+                      <select
+                        value={activeNode.data.method || "GET"}
+                        onChange={(e) => handleUpdateNodeData("method", e.target.value)}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      >
+                        <option value="GET">GET</option>
+                        <option value="POST">POST</option>
+                        <option value="PUT">PUT</option>
+                      </select>
+                    </div>
+                  </div>
+                )}
+
+                {activeNode.type === "custom_script" && (
+                  <div>
+                    <label className="text-[10px] text-zinc-500 font-bold block mb-1">JavaScript Code block</label>
+                    <textarea
+                      value={activeNode.data.code || "return items;"}
+                      onChange={(e) => handleUpdateNodeData("code", e.target.value)}
+                      rows={6}
+                      className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 font-mono focus:outline-none resize-none"
+                    />
+                  </div>
+                )}
+              </div>
+
+
+            ) : (
+              <p className="text-xs text-zinc-500">Select any block step to edit its rules.</p>
+            )}
+          </div>
         </div>
+      </div>
+
+      <div className="bg-zinc-950 border border-zinc-800 p-5 rounded-2xl">
+        <label className="text-xs text-zinc-500 font-bold block mb-2 uppercase tracking-wider">Compile Output Terminal</label>
+        <pre className="text-zinc-400 font-mono text-[10px] overflow-auto max-h-40 whitespace-pre-wrap bg-zinc-900/30 p-3 rounded border border-zinc-850">
+          {outputLogs || "Ready."}
+        </pre>
       </div>
     </div>
   );

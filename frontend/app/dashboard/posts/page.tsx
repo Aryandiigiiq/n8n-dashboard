@@ -22,18 +22,36 @@ export default function PostsPage() {
     const [syncing, setSyncing] = useState(false);
     const [dropdownOpen, setDropdownOpen] = useState<string | null>(null);
 
+    const [platformFilter, setPlatformFilter] = useState("");
+    const [campaignFilter, setCampaignFilter] = useState("");
+    const [searchQuery, setSearchQuery] = useState("");
+    const [availableWorkflows, setAvailableWorkflows] = useState<any[]>([]);
+
+    const [selectedPostIds, setSelectedPostIds] = useState<string[]>([]);
+    const [batchDropdownOpen, setBatchDropdownOpen] = useState(false);
+
     const loadData = async () => {
         try {
-            const res = await apiClient.get<SyncPost[]>("/posts");
+            const res = await apiClient.get<SyncPost[]>("/posts", {
+                params: {
+                    platform: platformFilter || undefined,
+                    campaign: campaignFilter || undefined,
+                    search: searchQuery || undefined
+                }
+            });
             setPosts(res.data);
+
+            const wfRes = await apiClient.get("/automations");
+            setAvailableWorkflows(wfRes.data);
         } catch (e) {
             console.error("Failed to fetch posts:", e);
         }
+
     };
 
     useEffect(() => {
         loadData();
-    }, []);
+    }, [platformFilter, campaignFilter, searchQuery]);
 
     const handleSync = async () => {
         setSyncing(true);
@@ -79,28 +97,90 @@ export default function PostsPage() {
         }
     };
 
+    const togglePostSelection = (postId: string) => {
+        setSelectedPostIds((prev) =>
+            prev.includes(postId) ? prev.filter((id) => id !== postId) : [...prev, postId]
+        );
+    };
+
+    const handleBatchAssign = async (type: string) => {
+        setBatchDropdownOpen(false);
+        const selectedPosts = posts.filter((p) => selectedPostIds.includes(p.post_id));
+        for (const post of selectedPosts) {
+            await handleLinkWorkflow(post, type);
+        }
+        setSelectedPostIds([]);
+        alert(`Assigned "${type}" to ${selectedPosts.length} posts successfully.`);
+    };
+
     return (
         <div className="space-y-6 animate-in fade-in duration-300">
-            <div className="flex items-center justify-between">
+            <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4">
                 <div>
                     <h1 className="text-2xl font-bold text-zinc-100">Social Channel Posts</h1>
                     <p className="text-zinc-400 text-xs mt-1">Directly sync live Facebook/Instagram post metrics</p>
                 </div>
-                <button
-                    onClick={handleSync}
-                    disabled={syncing}
-                    className="px-4 py-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 disabled:bg-zinc-800 text-zinc-200 text-xs font-semibold rounded-xl cursor-pointer"
-                >
-                    {syncing ? "Syncing..." : "Sync from Facebook/IG"}
-                </button>
+                <div className="flex flex-wrap items-center gap-3 relative">
+                    <input
+                        type="text"
+                        placeholder="Search captions..."
+                        value={searchQuery}
+                        onChange={(e) => setSearchQuery(e.target.value)}
+                        className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs px-3 py-2 rounded-xl focus:outline-none"
+                    />
+                    <select
+                        value={platformFilter}
+                        onChange={(e) => setPlatformFilter(e.target.value)}
+                        className="bg-zinc-900 border border-zinc-800 text-zinc-300 text-xs px-3 py-2 rounded-xl focus:outline-none"
+                    >
+                        <option value="">All Platforms</option>
+                        <option value="instagram">Instagram</option>
+                        <option value="linkedin">LinkedIn</option>
+                    </select>
+
+                    {selectedPostIds.length > 0 && (
+                        <div>
+                            <button
+                                onClick={() => setBatchDropdownOpen(!batchDropdownOpen)}
+                                className="px-4 py-2 bg-indigo-600 hover:bg-indigo-700 text-white text-xs font-semibold rounded-xl cursor-pointer"
+                            >
+                                Batch Actions ({selectedPostIds.length}) ▾
+                            </button>
+                            {batchDropdownOpen && (
+                                <div className="absolute right-0 mt-2 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl z-30 w-48 py-2">
+                                    <button
+                                        onClick={() => handleBatchAssign("Auto Reply")}
+                                        className="w-full text-left block px-4 py-2 hover:bg-zinc-850 text-zinc-300 text-xs font-medium cursor-pointer"
+                                    >
+                                        Assign Auto Reply
+                                    </button>
+                                    <button
+                                        onClick={() => handleBatchAssign("Support Answers")}
+                                        className="w-full text-left block px-4 py-2 hover:bg-zinc-850 text-zinc-300 text-xs font-medium cursor-pointer"
+                                    >
+                                        Assign Support Replies
+                                    </button>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    <button
+                        onClick={handleSync}
+                        disabled={syncing}
+                        className="px-4 py-2 bg-zinc-900 border border-zinc-800 hover:bg-zinc-850 disabled:bg-zinc-800 text-zinc-200 text-xs font-semibold rounded-xl cursor-pointer"
+                    >
+                        {syncing ? "Syncing..." : "Sync from Facebook/IG"}
+                    </button>
+                </div>
             </div>
 
             <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
-                {posts.map((post) => {
+                {posts.map((post, index) => {
                     const mockThumb = "https://images.unsplash.com/photo-1611162617213-7d7a39e9b1d7?auto=format&fit=crop&w=300&q=80";
 
                     return (
-                        <div key={post.post_id} className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl overflow-hidden flex flex-col justify-between">
+                        <div key={`${post.post_id}-${index}`} className="bg-zinc-900/40 border border-zinc-800/80 rounded-2xl overflow-hidden flex flex-col justify-between">
                             <div>
                                 <div className="relative h-44 bg-zinc-950">
                                     {/* eslint-disable-next-line @next/next/no-img-element */}
@@ -108,6 +188,12 @@ export default function PostsPage() {
                                     <span className="absolute top-3 right-3 px-2 py-0.5 text-[9px] font-bold uppercase bg-zinc-950/80 border border-zinc-800 rounded text-zinc-300">
                                         {post.platform}
                                     </span>
+                                    <input
+                                        type="checkbox"
+                                        checked={selectedPostIds.includes(post.post_id)}
+                                        onChange={() => togglePostSelection(post.post_id)}
+                                        className="absolute top-3 left-3 h-4 w-4 bg-zinc-950 border border-zinc-800 rounded cursor-pointer accent-indigo-600"
+                                    />
                                 </div>
                                 <div className="p-5 space-y-2">
                                     <p className="text-xs text-zinc-300 line-clamp-3 leading-relaxed">{post.caption || "No caption provided."}</p>
@@ -142,7 +228,7 @@ export default function PostsPage() {
                                         Automation ▾
                                     </button>
                                     {dropdownOpen === post.post_id && (
-                                        <div className="absolute right-5 bottom-16 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl z-20 w-48 py-2 animate-in fade-in duration-200">
+                                        <div className="absolute right-5 bottom-16 bg-zinc-950 border border-zinc-800 rounded-xl shadow-2xl z-20 w-48 py-2 animate-in fade-in duration-200 max-h-60 overflow-y-auto">
                                             <Link
                                                 href={`/dashboard/workflows?new=true&post_id=${post.post_id}&post_url=${encodeURIComponent(post.permalink)}&platform=${post.platform}&caption=${encodeURIComponent(post.caption || "")}`}
                                                 className="w-full text-left block px-4 py-2 hover:bg-zinc-850 text-zinc-300 text-xs font-medium"
@@ -150,31 +236,56 @@ export default function PostsPage() {
                                                 Create New Flow
                                             </Link>
                                             <hr className="border-zinc-850 my-1" />
-                                            <div className="px-4 py-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Saved Automations</div>
-                                            <button
-                                                onClick={() => handleLinkWorkflow(post, "Auto Reply")}
-                                                className="w-full text-left block px-4 py-2 hover:bg-zinc-850 text-zinc-300 text-xs font-medium cursor-pointer"
-                                            >
-                                                Auto Reply
-                                            </button>
-                                            <button
-                                                onClick={() => handleLinkWorkflow(post, "Support Answers")}
-                                                className="w-full text-left block px-4 py-2 hover:bg-zinc-850 text-zinc-300 text-xs font-medium cursor-pointer"
-                                            >
-                                                Support Replies
-                                            </button>
-                                            <button
-                                                onClick={() => handleLinkWorkflow(post, "Lead Capture")}
-                                                className="w-full text-left block px-4 py-2 hover:bg-zinc-850 text-zinc-300 text-xs font-medium cursor-pointer"
-                                            >
-                                                Lead Capture
-                                            </button>
-                                            <button
-                                                onClick={() => handleLinkWorkflow(post, "Sales Follow-up")}
-                                                className="w-full text-left block px-4 py-2 hover:bg-zinc-850 text-zinc-300 text-xs font-medium cursor-pointer"
-                                            >
-                                                Sales Follow-up
-                                            </button>
+                                            <div className="px-4 py-1 text-[9px] font-bold text-zinc-500 uppercase tracking-wider">Select Saved Flow</div>
+                                            {availableWorkflows.map((wf, idx) => (
+                                                <button
+                                                    key={`${wf.id}-${idx}`}
+                                                    onClick={async () => {
+                                                        setDropdownOpen(null);
+                                                        try {
+                                                            await apiClient.put(`/automations/${wf.id}`, {
+                                                                post_id: post.post_id,
+                                                                permalink: post.permalink,
+                                                                platform: post.platform,
+                                                                post_thumbnail: wf.post_thumbnail || "",
+                                                                post_caption: wf.post_caption || "Social Post",
+                                                                visual_graph: wf.visual_graph
+                                                            });
+                                                            await apiClient.post(`/automations/${wf.id}/publish?activate=true`);
+                                                            await loadData();
+                                                            alert(`Assigned and activated workflow "${wf.post_caption}"!`);
+                                                        } catch (e) {
+                                                            alert("Failed to assign flow.");
+                                                        }
+                                                    }}
+                                                    className="w-full text-left block px-4 py-2 hover:bg-zinc-850 text-zinc-300 text-xs font-medium truncate cursor-pointer"
+                                                >
+                                                    {wf.post_caption || `Flow #${wf.id}`}
+                                                </button>
+                                            ))}
+                                            {post.is_active && (
+                                                <>
+                                                    <hr className="border-zinc-850 my-1" />
+                                                    <button
+                                                        onClick={async () => {
+                                                            setDropdownOpen(null);
+                                                            try {
+                                                                const activeWf = availableWorkflows.find(w => w.post_id === post.post_id);
+                                                                if (activeWf) {
+                                                                    await apiClient.post(`/automations/${activeWf.id}/publish?activate=false`);
+                                                                }
+                                                                await loadData();
+                                                                alert("Automation deactivated.");
+                                                            } catch (e) {
+                                                                alert("Failed to deactivate.");
+                                                            }
+                                                        }}
+                                                        className="w-full text-left block px-4 py-2 hover:bg-rose-950/40 text-rose-400 text-xs font-semibold cursor-pointer"
+                                                    >
+                                                        Deactivate Flow
+                                                    </button>
+                                                </>
+                                            )}
                                         </div>
                                     )}
                                 </div>

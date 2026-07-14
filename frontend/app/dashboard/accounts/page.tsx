@@ -13,7 +13,7 @@ function CallbackContent() {
     useEffect(() => {
         const exchangeCode = async () => {
             const code = searchParams.get("code");
-            const platform = searchParams.get("platform") || "instagram";
+            const state = searchParams.get("state") || "instagram";
 
             if (!code) {
                 setError("Authorization code is missing.");
@@ -21,9 +21,12 @@ function CallbackContent() {
             }
 
             try {
-                const endpoint = platform === "linkedin"
-                    ? "/oauth/linkedin/callback"
-                    : "/oauth/meta/callback";
+                let endpoint = "/oauth/meta/instagram/callback";
+                if (state === "linkedin") {
+                    endpoint = "/oauth/meta/linkedin/callback";
+                } else if (state === "facebook") {
+                    endpoint = "/oauth/meta/facebook/callback";
+                }
 
                 await apiClient.post(endpoint, { code });
                 setStatus("Connected successfully! Redirecting...");

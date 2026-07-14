@@ -8,8 +8,11 @@ interface WorkflowExecution {
     n8n_execution_id: string | null;
     status: string;
     trigger_type: string;
+    duration_ms?: number;
+    workflow_version?: string;
     created_at: string;
 }
+
 
 export default function ExecutionsPage() {
     const [executions, setExecutions] = useState<WorkflowExecution[]>([]);
@@ -53,8 +56,11 @@ export default function ExecutionsPage() {
                                 <th className="py-2.5">Execution ID</th>
                                 <th className="py-2.5">Status</th>
                                 <th className="py-2.5">Trigger Type</th>
+                                <th className="py-2.5">Duration (ms)</th>
+                                <th className="py-2.5">Version</th>
                                 <th className="py-2.5">Start Time</th>
                             </tr>
+
                         </thead>
                         <tbody className="divide-y divide-zinc-800/40 text-xs text-zinc-300">
                             {executions.map((e) => (
@@ -69,8 +75,11 @@ export default function ExecutionsPage() {
                                         </span>
                                     </td>
                                     <td className="py-3.5 font-medium">{e.trigger_type}</td>
+                                    <td className="py-3.5 text-zinc-400 font-mono">{e.duration_ms !== undefined ? `${e.duration_ms}ms` : "-"}</td>
+                                    <td className="py-3.5 text-zinc-400 font-mono">{e.workflow_version || "1.0"}</td>
                                     <td className="py-3.5 text-zinc-500">{new Date(e.created_at).toLocaleString()}</td>
                                 </tr>
+
                             ))}
                         </tbody>
                     </table>
