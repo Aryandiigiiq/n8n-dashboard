@@ -16,12 +16,12 @@ class SyncPostResponse(BaseModel):
     post_id: str
     permalink: str
     platform: str
-    caption: Optional[str]
-    media_type: Optional[str]
-    likes: int
-    comments: int
-    automation_count: int
-    is_active: bool
+    caption: Optional[str] = None
+    media_type: Optional[str] = None
+    likes: Optional[int] = 0
+    comments: Optional[int] = 0
+    automation_count: Optional[int] = 0
+    is_active: Optional[bool] = False
 
 def get_or_create_workspace(db: Session, user_id: int) -> Workspace:
     ws = db.query(Workspace).filter(Workspace.owner_id == user_id).first()

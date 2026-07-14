@@ -35,3 +35,17 @@ class N8NClient:
             response = await client.post(url, json=payload)
             response.raise_for_status()
             return response.json()
+
+    async def activate_workflow(self, workflow_id: str) -> dict:
+        async with httpx.AsyncClient() as client:
+            url = f"{self.base_url}/api/v1/workflows/{workflow_id}/activate"
+            response = await client.post(url, headers=self.headers)
+            response.raise_for_status()
+            return response.json()
+
+    async def deactivate_workflow(self, workflow_id: str) -> dict:
+        async with httpx.AsyncClient() as client:
+            url = f"{self.base_url}/api/v1/workflows/{workflow_id}/deactivate"
+            response = await client.post(url, headers=self.headers)
+            response.raise_for_status()
+            return response.json()

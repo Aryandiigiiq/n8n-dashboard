@@ -49,21 +49,37 @@ def create_automation(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    ws = get_or_create_workspace(db, current_user.id)
-    auto = PostAutomation(
-        workspace_id=ws.id,
-        post_id=data.post_id,
-        permalink=data.permalink,
-        platform=data.platform,
-        post_thumbnail=data.post_thumbnail,
-        post_caption=data.post_caption,
-        visual_graph=data.visual_graph,
-        is_active=False
-    )
-    db.add(auto)
-    db.commit()
-    db.refresh(auto)
-    return auto
+        ws = get_or_create_workspace(db, current_user.id)
+    
+        # Check if a PostAutomation record already exists for this post
+        auto = db.query(PostAutomation).filter(
+            PostAutomation.workspace_id == ws.id,
+            PostAutomation.post_id == data.post_id
+        ).first()
+        
+        if auto:
+            auto.permalink = data.permalink
+            auto.platform = data.platform
+            auto.post_thumbnail = data.post_thumbnail
+            auto.post_caption = data.post_caption
+            auto.visual_graph = data.visual_graph
+        else:
+            auto = PostAutomation(
+                workspace_id=ws.id,
+                post_id=data.post_id,
+                permalink=data.permalink,
+                platform=data.platform,
+                post_thumbnail=data.post_thumbnail,
+                post_caption=data.post_caption,
+                visual_graph=data.visual_graph,
+                is_active=False
+            )
+            db.add(auto)
+                
+        db.commit()
+
+        db.refresh(auto)
+        return auto
 
 @router.get("", response_model=list[AutomationResponse])
 def list_automations(
@@ -122,8 +138,12 @@ async def publish_automation(
             res = await client.create_workflow(n8n_json)
             auto.n8n_workflow_id = str(res.get("id"))
         
+        # Activate webhook listeners inside n8n engine
+        await client.activate_workflow(auto.n8n_workflow_id)
+        
         auto.is_active = True
         db.commit()
+
         db.refresh(auto)
         return auto
     except Exception as e:

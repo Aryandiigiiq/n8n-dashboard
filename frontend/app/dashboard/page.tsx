@@ -1,65 +1,56 @@
 "use client";
 
-import React, { useState } from "react";
+import React, { useEffect, useState } from "react";
+import Link from "next/link";
 import apiClient from "@/services/api";
+import { automationService } from "@/services/automation";
 
-export default function SettingsPage() {
-  const [connecting, setConnecting] = useState(false);
-  const [error, setError] = useState("");
+export default function DashboardPage() {
+  const [stats, setStats] = useState({ posts: 0, automations: 0, executions: 0 });
 
-  const handleConnect = async () => {
-    setConnecting(true);
-    setError("");
-    try {
-      const res = await apiClient.get<{ url: string }>("/oauth/meta/authorize");
-      if (res.data && res.data.url) {
-        window.location.href = res.data.url;
-      } else {
-        setError("Failed to retrieve authorization URL.");
+  useEffect(() => {
+    const fetchStats = async () => {
+      try {
+        const postsRes = await apiClient.get("/posts");
+        const autos = await automationService.getAutomations();
+        setStats({
+          posts: postsRes.data.length,
+          automations: autos.length,
+          executions: autos.filter((a) => a.is_active).length
+        });
+      } catch (e) {
+        console.error("Failed to load statistics:", e);
       }
-    } catch (e) {
-      setError("Failed to connect with Meta API.");
-    } finally {
-      setConnecting(false);
-    }
-  };
+    };
+    fetchStats();
+  }, []);
 
   return (
-    <div className="space-y-6 max-w-xl animate-in fade-in duration-300">
-      <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-2xl">
-        <h3 className="text-lg font-bold text-zinc-200">AOS Configurations</h3>
-        <p className="text-xs text-zinc-500 mt-1">Configure your Workspace references and n8n triggers.</p>
-        <div className="mt-6 space-y-4">
-          <div>
-            <label className="text-xs text-zinc-400 font-semibold block mb-1">n8n API endpoint</label>
-            <input
-              type="text"
-              defaultValue="http://localhost:5678"
-              className="w-full bg-zinc-950 border border-zinc-800 px-3 py-2 rounded text-zinc-300"
-              disabled
-            />
-          </div>
-        </div>
+    <div className="space-y-8 animate-in fade-in duration-300">
+      <div className="p-8 rounded-2xl bg-gradient-to-r from-indigo-500/10 via-purple-500/5 to-transparent border border-zinc-800/80">
+        <h1 className="text-3xl font-extrabold text-zinc-100 tracking-tight">
+          Automation Operating System
+        </h1>
+        <p className="mt-2 text-zinc-400 text-sm max-w-xl">
+          Zero-code business automation orchestration. Connect channels, track auto-replies, and build custom trigger flows instantly.
+        </p>
       </div>
 
-      <div className="p-6 bg-zinc-900 border border-zinc-800 rounded-2xl">
-        <h3 className="text-lg font-bold text-zinc-200">Integrations</h3>
-        <p className="text-xs text-zinc-500 mt-1">Link your Meta channels to enable synchronized posting and triggers.</p>
-
-        {error && (
-          <div className="mt-4 p-3 bg-rose-500/10 border border-rose-500/20 text-rose-400 rounded-xl text-xs">
-            {error}
-          </div>
-        )}
-
-        <div className="mt-6">
-          <button
-            onClick={handleConnect}
-            disabled={connecting}
-            className="px-5 py-2.5 bg-indigo-600 hover:bg-indigo-700 disabled:bg-indigo-800 text-white text-xs font-semibold rounded-xl transition-all shadow-md cursor-pointer"
-          >
-            {connecting ? "Connecting..." : "Connect Instagram Channel"}
-          </button>
+      <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
+        <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl space-y-2">
+          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Synced Posts</span>
+          <h3 className="text-3xl font-bold text-zinc-150">{stats.posts}</h3>
+          <p className="text-[11px] text-zinc-450">Discovered media posts from Meta</p>
+        </div>
+        <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl space-y-2">
+          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Total Automations</span>
+          <h3 className="text-3xl font-bold text-zinc-150">{stats.automations}</h3>
+          <p className="text-[11px] text-zinc-450">Active visual layouts compiled to n8n</p>
+        </div>
+        <div className="p-6 bg-zinc-900/40 border border-zinc-800 rounded-2xl space-y-2">
+          <span className="text-[10px] text-zinc-500 font-bold uppercase tracking-wider">Running Workflows</span>
+          <h3 className="text-3xl font-bold text-zinc-150">{stats.executions}</h3>
+          <p className="text-[11px] text-zinc-450">Live auto-reply webhook events active</p>
         </div>
       </div>
     </div>

@@ -105,13 +105,16 @@ function BuilderContent() {
     );
   };
 
-  const handleAddBlock = (type: "if_condition" | "send_request" | "store_value" | "delay") => {
+  const handleAddBlock = (type: "if_condition" | "send_request" | "store_value" | "delay" | "loop" | "switch" | "ai_action") => {
     const newId = String(Date.now());
     let defaultData = {};
     if (type === "if_condition") defaultData = { operator: "contains", keyword: "" };
     if (type === "send_request") defaultData = { action_type: "reply", text: "" };
     if (type === "store_value") defaultData = { variable_name: "key", variable_value: "" };
     if (type === "delay") defaultData = { duration: 5, unit: "minutes" };
+    if (type === "loop") defaultData = { batch_size: 1 };
+    if (type === "switch") defaultData = { rules: [{ value: "support" }] };
+    if (type === "ai_action") defaultData = { prompt: "" };
 
     const newBlock: VisualNode = { id: newId, type, data: defaultData };
     setNodes((prev) => [...prev, newBlock]);
@@ -203,8 +206,8 @@ function BuilderContent() {
                 key={a.id}
                 onClick={() => loadSelectedAutomation(a)}
                 className={`w-full text-left px-3 py-2.5 rounded-lg text-xs font-semibold border transition-all truncate block ${selectedId === a.id
-                    ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/50"
-                    : "bg-zinc-950/40 text-zinc-400 border-zinc-800 hover:text-zinc-100 hover:bg-zinc-850"
+                  ? "bg-indigo-500/10 text-indigo-400 border-indigo-500/50"
+                  : "bg-zinc-950/40 text-zinc-400 border-zinc-800 hover:text-zinc-100 hover:bg-zinc-850"
                   }`}
               >
                 {a.post_caption || `Automation ${a.id}`}
@@ -247,8 +250,8 @@ function BuilderContent() {
                   <div
                     onClick={() => setSelectedNodeIndex(index)}
                     className={`w-full max-w-sm p-4 rounded-xl border transition-all cursor-pointer relative group ${selectedNodeIndex === index
-                        ? "bg-indigo-500/10 border-indigo-500 text-indigo-200"
-                        : "bg-zinc-900/60 border-zinc-850 hover:border-zinc-700 text-zinc-300"
+                      ? "bg-indigo-500/10 border-indigo-500 text-indigo-200"
+                      : "bg-zinc-900/60 border-zinc-850 hover:border-zinc-700 text-zinc-300"
                       }`}
                   >
                     <div className="flex items-center justify-between">
@@ -413,7 +416,47 @@ function BuilderContent() {
                       </div>
                     </div>
                   )}
+
+                  {activeNode.type === "loop" && (
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Batch Loop Count</label>
+                      <input
+                        type="number"
+                        value={activeNode.data.batch_size || 1}
+                        onChange={(e) => handleUpdateNodeData("batch_size", Number(e.target.value))}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      />
+                    </div>
+                  )}
+
+                  {activeNode.type === "switch" && (
+                    <div className="space-y-3">
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">Switch Paths (Separated by Commas)</label>
+                      <input
+                        type="text"
+                        defaultValue={(activeNode.data.rules || []).map((r: any) => r.value).join(", ")}
+                        onChange={(e) => {
+                          const vals = e.target.value.split(",").map((v) => ({ value: v.trim() }));
+                          handleUpdateNodeData("rules", vals);
+                        }}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none"
+                      />
+                    </div>
+                  )}
+
+                  {activeNode.type === "ai_action" && (
+                    <div>
+                      <label className="text-[10px] text-zinc-500 font-bold block mb-1">AI Prompt Instruction</label>
+                      <textarea
+                        value={activeNode.data.prompt || ""}
+                        onChange={(e) => handleUpdateNodeData("prompt", e.target.value)}
+                        rows={4}
+                        className="w-full bg-zinc-950 border border-zinc-800 rounded px-2.5 py-2 text-xs text-zinc-300 focus:outline-none resize-none font-sans"
+                      />
+                    </div>
+                  )}
                 </div>
+
               ) : (
                 <p className="text-xs text-zinc-500">Select any block step to edit its rules.</p>
               )}

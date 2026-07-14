@@ -8,10 +8,13 @@ from datetime import datetime
 
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 
+from typing import Optional, Union
+
 class WebhookCallbackPayload(BaseModel):
-    execution_id: int
+    execution_id: Optional[Union[int, str]] = None
     status: str  # success, failed
     output: dict
+
 
 @router.post("/callback")
 def execution_callback(data: WebhookCallbackPayload, db: Session = Depends(get_db)):
