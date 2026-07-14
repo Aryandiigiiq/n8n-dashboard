@@ -1,126 +1,117 @@
-import logging
 from fastapi import APIRouter, Depends, HTTPException
 from sqlalchemy.orm import Session
-from typing import Optional
-
 from app.database.session import get_db
 from app.auth.dependencies import get_current_user
 from app.models.user import User
-from app.schemas.post import PostCreate, PostUpdate, PostResponse, PostPreviewData, CalendarEvent
-from app.schemas.publishing_queue import PublishingQueueResponse
-from app.services.post_service import PostService
-from app.services.publishing_queue_service import PublishingQueueService
+from app.models.workspace import Workspace
+from app.models.credential import CredentialReference
+from app.models.automation import PostAutomation
+from pydantic import BaseModel
+from typing import Optional, List
+import httpx
 
-logger = logging.getLogger(__name__)
+router = APIRouter(prefix="/posts", tags=["Posts"])
 
-router = APIRouter(
-    prefix="/posts",
-    tags=["Posts"]
-)
+class SyncPostResponse(BaseModel):
+    post_id: str
+    permalink: str
+    platform: str
+    caption: Optional[str]
+    media_type: Optional[str]
+    likes: int
+    comments: int
+    automation_count: int
+    is_active: bool
 
+def get_or_create_workspace(db: Session, user_id: int) -> Workspace:
+    ws = db.query(Workspace).filter(Workspace.owner_id == user_id).first()
+    if not ws:
+        ws = Workspace(name="Default Workspace", owner_id=user_id)
+        db.add(ws)
+        db.commit()
+        db.refresh(ws)
+    return ws
 
-@router.get("", response_model=list[PostResponse])
-def get_posts(
-    status: Optional[str] = None,
+@router.post("/sync")
+async def sync_posts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    return PostService.get_user_posts(db, current_user.id, status)
+    workspace = get_or_create_workspace(db, current_user.id)
+    cred = db.query(CredentialReference).filter(
+        CredentialReference.workspace_id == workspace.id,
+        CredentialReference.platform == "instagram"
+    ).first()
 
+    if not cred:
+        return {"status": "skipped", "message": "No connected accounts to sync. Link accounts in Settings."}
 
-@router.get("/drafts", response_model=list[PostResponse])
-def get_drafts(
+    async with httpx.AsyncClient() as client:
+        media_res = await client.get(
+            f"https://graph.facebook.com/v19.0/{cred.account_id}/media",
+            params={
+                "fields": "id,media_url,permalink,caption,timestamp,like_count,comments_count,media_type",
+                "access_token": cred.page_access_token
+            }
+        )
+        if media_res.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to retrieve posts from Instagram API")
+        
+        media_data = media_res.json().get("data", [])
+
+        for media in media_data:
+            post_id = media.get("id")
+            auto = db.query(PostAutomation).filter(
+                PostAutomation.workspace_id == workspace.id,
+                PostAutomation.post_id == post_id
+            ).first()
+
+            if auto:
+                auto.like_count = media.get("like_count", 0)
+                auto.comment_count = media.get("comments_count", 0)
+                auto.post_caption = media.get("caption", "")
+                auto.post_thumbnail = media.get("media_url", "")
+            else:
+                auto = PostAutomation(
+                    workspace_id=workspace.id,
+                    post_id=post_id,
+                    permalink=media.get("permalink", ""),
+                    platform="instagram",
+                    post_thumbnail=media.get("media_url", ""),
+                    post_caption=media.get("caption", ""),
+                    media_type=media.get("media_type"),
+                    like_count=media.get("like_count", 0),
+                    comment_count=media.get("comments_count", 0),
+                    visual_graph={"nodes": [], "edges": []},
+                    is_active=False
+                )
+                db.add(auto)
+            db.commit()
+
+    return {"status": "success", "synced_count": len(media_data)}
+
+@router.get("", response_model=List[SyncPostResponse])
+def list_posts(
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
-    """Return only draft and ready-to-publish posts."""
-    return PostService.get_drafts(db, current_user.id)
+    workspace = get_or_create_workspace(db, current_user.id)
+    automations = db.query(PostAutomation).filter(PostAutomation.workspace_id == workspace.id).all()
 
-
-@router.get("/calendar", response_model=list[CalendarEvent])
-def get_calendar_events(
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Return all scheduled posts as calendar events."""
-    return PostService.get_calendar_events(db, current_user.id)
-
-
-@router.get("/{post_id}", response_model=PostResponse)
-def get_post(
-    post_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return PostService.get_post(db, post_id, current_user.id)
-
-
-@router.get("/{post_id}/preview", response_model=PostPreviewData)
-def get_post_preview(
-    post_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Return preview-specific data for the post composer preview panel."""
-    return PostService.get_preview_data(db, post_id, current_user.id)
-
-
-@router.post("", response_model=PostResponse, status_code=201)
-def create_post(
-    data: PostCreate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return PostService.create_post(db, data, current_user.id)
-
-
-@router.put("/{post_id}", response_model=PostResponse)
-def update_post(
-    post_id: int,
-    data: PostUpdate,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    return PostService.update_post(db, post_id, data, current_user.id)
-
-
-@router.delete("/{post_id}", status_code=204)
-def delete_post(
-    post_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    PostService.delete_post(db, post_id, current_user.id)
-
-
-@router.post("/{post_id}/ready", response_model=PostResponse)
-def mark_ready(
-    post_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """
-    Mark a post as 'ready to publish'.
-    This validates the post and moves it to the publishing queue.
-    """
-    post = PostService.mark_ready_to_publish(db, post_id, current_user.id)
-    PublishingQueueService.enqueue_post(db, post_id, current_user.id)
-    return post
-
-
-@router.get("/{post_id}/queue", response_model=list[PublishingQueueResponse])
-def get_post_queue_status(
-    post_id: int,
-    db: Session = Depends(get_db),
-    current_user: User = Depends(get_current_user)
-):
-    """Return publishing queue entries for a specific post."""
-    # Verify post ownership
-    PostService.get_post(db, post_id, current_user.id)
-    from app.models.publishing_queue import PublishingQueue
-    return (
-        db.query(PublishingQueue)
-        .filter(PublishingQueue.post_id == post_id)
-        .order_by(PublishingQueue.created_at.desc())
-        .all()
-    )
+    response_list = []
+    for auto in automations:
+        flow_count = 1 if auto.n8n_workflow_id else 0
+        response_list.append(
+            SyncPostResponse(
+                post_id=auto.post_id,
+                permalink=auto.permalink,
+                platform=auto.platform,
+                caption=auto.post_caption,
+                media_type=auto.media_type,
+                likes=auto.like_count,
+                comments=auto.comment_count,
+                automation_count=flow_count,
+                is_active=auto.is_active
+            )
+        )
+    return response_list

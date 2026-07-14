@@ -16,3 +16,6 @@ ACCESS_TOKEN_EXPIRE_MINUTES = int(os.getenv("ACCESS_TOKEN_EXPIRE_MINUTES", "60")
 META_CLIENT_ID = os.getenv("META_APP_ID", os.getenv("META_CLIENT_ID", "mock-meta-client-id"))
 META_CLIENT_SECRET = os.getenv("META_APP_SECRET", os.getenv("META_CLIENT_SECRET", "mock-meta-client-secret"))
 META_REDIRECT_URI = os.getenv("META_REDIRECT_URI", "http://localhost:3000/dashboard/accounts")
+
+N8N_BASE_URL = os.getenv("N8N_BASE_URL", "http://localhost:5678")
+N8N_API_KEY = os.getenv("N8N_API_KEY", "")

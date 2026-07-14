@@ -1,112 +1,28 @@
-# DEVELOPMENT_PLAN.md
+Vision
 
-# Social Media Operating System (SMOS)
+Build a modern Automation Operating System powered entirely by n8n.
 
-Version: v0.1.0
+Backend is only an orchestration layer.
 
----
+No platform integrations are implemented in this project.
 
-# Purpose
+Core Principles
 
-This document is the master blueprint of the project.
+Everything goes through n8n.
 
-It explains:
+Backend never calls Meta.
 
-- System architecture
-- Folder responsibilities
-- Build order
-- Data flow
-- Module dependencies
-- Development roadmap
-- Best practices
+Backend never calls LinkedIn.
 
-This file should always answer:
+Backend never calls Slack.
 
-> "What should I build next?"
+Backend never calls GitHub.
 
----
+Backend never performs workflow logic.
 
-# Overall Vision
+n8n performs every automation.
 
-The platform should allow users to completely manage every supported social media platform from a single dashboard.
-
-The primary goal of Version 1 is to remove the need for users to open individual social media platforms.
-
-Users should be able to:
-
-- Connect accounts
-- Manage connected accounts
-- Create posts
-- Edit posts
-- Save drafts
-- Schedule posts
-- Publish posts
-- Manage media
-- View inbox
-- Reply to comments
-- Reply to messages
-- Manage platform settings
-
-The platform must support adding new social media platforms without modifying existing business logic.
-
-Automation, AI and Analytics are Version 2 features.
-
-n8n is responsible only for workflow execution after the Social Media Operating System is complete.
-
-FastAPI remains the source of truth for all business logic.
-
-# High Level Architecture
-
-                     User
-                       │
-                       ▼
-             Next.js Dashboard
-                       │
-             REST API / WebSocket
-                       │
-                       ▼
-                FastAPI Backend
-                       │
- ┌───────────────┬───────────────┬───────────────┐
- │               │               │               │
- ▼               ▼               ▼               ▼
-Database    Integration      AI Engine      n8n Engine
-(Postgres)     Engine        (OpenAI)       (Automation)
-
-                       │
-                       ▼
-           Social Media Platforms
-
-Instagram
-
-Facebook
-
-LinkedIn
-
-Threads
-
-YouTube
-
-TikTok
-
-Twitter/X
-
-WhatsApp
-
-Pinterest
-
-Snapchat
-
-etc.
-
----
-
-# Request Flow
-
-Example
-
-Publish Post
-
+High Level Architecture
 User
 
 ↓
@@ -115,311 +31,19 @@ Frontend
 
 ↓
 
-Backend API
+REST API
 
 ↓
 
-Post Service
+FastAPI
 
 ↓
 
-Integration Engine
+Workflow Service
 
 ↓
 
-Platform Connector
-
-↓
-
-Platform API
-
-↓
-
-Response Mapper
-
-↓
-
-Database
-
-↓
-
-Frontend
-
-Every feature should follow this flow.
-
----
-
-# Project Build Order
-
-Never build randomly.
-
-Always build from the bottom upward.
-
-Order
-1. Project Setup
-
-2. Database
-
-3. Authentication
-
-4. Core Models
-
-5. Services
-
-6. Integration Engine
-
-7. Platform Management
-
-8. Content Management
-
-9. Engagement Management
-
-10. Workspace & Settings
-
-11. Production Hardening
-
-12. Automation (n8n)
-
-13. Analytics
-
-14. AI
-
-15. Documentation
----
-
-# Backend Architecture
-
-backend/
-
-Purpose
-
-Contains every business rule of the application.
-
-Nothing outside backend should contain business logic.
-
-Flow
-
-API
-
-↓
-
-Service
-
-↓
-
-Integration Engine
-
-↓
-
-Database
-
-↓
-
-Response
-
----
-
-## api/
-
-Purpose
-
-Only receives requests.
-
-Responsibilities
-
-- Validation
-- Authentication
-- Call services
-- Return responses
-
-Never
-
-- Database logic
-- Platform logic
-- AI logic
-
----
-
-## auth/
-
-Purpose
-
-Authentication layer.
-
-Responsibilities
-
-- Login
-- Register
-- JWT
-- OAuth
-- Sessions
-- Roles
-- Permissions
-
----
-
-## database/
-
-Purpose
-
-Database configuration.
-
-Responsibilities
-
-- PostgreSQL connection
-- SQLAlchemy
-- Sessions
-- Migrations
-- Base models
-
----
-
-## models/
-
-Purpose
-
-Represents database tables.
-
-Every entity in the system has a model.
-
-Examples
-
-User
-
-Account
-
-Post
-
-Message
-
-Comment
-
-Analytics
-
-Automation
-
-Variable
-
-Integration
-
----
-
-## schemas/
-
-Purpose
-
-API request and response validation.
-
-Contains
-
-Request Models
-
-Response Models
-
-DTOs
-
-Validation
-
----
-
-## services/
-
-Purpose
-
-Business logic.
-
-This is the heart of the application.
-
-Examples
-
-PostService
-
-AccountService
-
-AnalyticsService
-
-AutomationService
-
-Every API endpoint should call a service.
-
----
-
-## integrations/
-
-Purpose
-
-Universal connector framework.
-
-The rest of the application must never know which platform it is talking to.
-
-Instead of:
-
-publish_to_instagram()
-
-Everything becomes:
-
-publish_post()
-
-The Integration Engine decides where to send it.
-
-Subfolders
-
-engine/
-Core communication logic.
-
-registry/
-Lists available integrations and their capabilities.
-
-runtime/
-Loads connectors and executes requests.
-
-templates/
-Connector templates and configuration.
-
-validators/
-OAuth, payload, and response validation.
-
-This architecture allows new platforms to be added without changing the rest of the system.
-
----
-
-## ai/
-
-Purpose
-
-AI assistance only.
-
-Responsibilities
-
-Caption generation
-
-Reply suggestions
-
-Hashtag suggestions
-
-Summaries
-
-Future recommendations
-
-AI should assist users—not replace manual control.
-
----
-
-## n8n/
-
-Purpose
-
-Workflow execution only.
-
-Never place business logic in n8n.
-
-Correct Flow
-
-Backend
-
-↓
-
-n8n
+n8n REST API
 
 ↓
 
@@ -427,563 +51,371 @@ Workflow
 
 ↓
 
-Backend callback
-
----
-
-# Frontend Architecture
-
-frontend/
-
-Purpose
-
-User Interface.
-
-Should never contain business logic.
-
+External Systems
 Responsibilities
 
-- Dashboard
-- Forms
-- Tables
-- Graphs
-- Settings
-- Authentication UI
+Frontend
 
-The frontend only communicates with the backend.
+Only UI
 
----
-
-## app/
-
-Contains routes/pages.
-
----
-
-## components/
-
-Reusable UI components.
-
-Example
-
-Sidebar
-
-Header
-
-Post Editor
-
-Charts
-
-Dialogs
-
-Cards
-
-Buttons
-
----
-
-## hooks/
-
-Reusable React logic.
+Backend
 
 Authentication
 
-Fetching
+Workflow execution
 
-Caching
+Templates
 
-Pagination
+Variables
 
----
+Permissions
 
-## services/
+History
 
-Frontend API layer.
+Logs
 
-Never call fetch() directly inside components.
+Database
 
-Always go through services.
+Stores
 
----
+Users
 
-## types/
+Workspaces
 
-Shared TypeScript interfaces.
+Templates
 
----
+Variables
 
-## utils/
+Execution History
 
-Frontend helper functions.
+Credentials Metadata
 
----
+Never stores third-party tokens.
 
-# Database Layer
+n8n stores credentials.
 
-Recommended implementation order
+Folder Responsibilities
 
-1. User
+backend/
 
-↓
+auth/
 
-2. Integration
+workflow/
 
-↓
+templates/
 
-3. Account
+executions/
 
-↓
+history/
 
-4. Post
+variables/
 
-↓
+logs/
 
-5. Message
+webhooks/
 
-↓
+frontend/
 
-6. Comment
+dashboard/
 
-↓
+workflow/
 
-7. Automation
+templates/
 
-↓
+executions/
 
-8. Analytics
+settings/
 
-↓
+docs/
 
-9. Variables
+n8n/
 
-Build relationships only after all models exist.
+Workflow Execution
 
----
+Every button follows
 
-# Integration Engine
-
-Goal
-
-Support unlimited platforms.
-
-Connector Flow
-
-Connector
+User
 
 ↓
 
-OAuth
+Button
 
 ↓
 
-Access Token
+Backend
 
 ↓
 
-API Request
+Execute Workflow
 
 ↓
 
-Response Mapper
+n8n
 
 ↓
 
-Unified Response
-
-All platform-specific behavior must remain inside connectors.
-
----
-
-# AI Architecture
-
-Prompt
+External Service
 
 ↓
 
-OpenAI / Gemini
+Backend Callback
 
 ↓
 
-Structured Output
+Database
 
 ↓
 
-Backend Validation
+Frontend
+Workflow Templates
+
+Examples
+
+Comment Auto Reply
+
+Lead Capture
+
+GitHub Issue Creator
+
+Sentry Error Processor
+
+Slack Notification
+
+Email Automation
+
+CRM Sync
+
+Social Publishing
+
+Invoice Generator
+
+Document Processing
+
+Variables
+
+Each workflow receives
+
+JSON variables
+
+Example
+
+{
+  "keyword":"refund",
+  "reply":"Please DM us.",
+  "delay":5
+}
+Webhooks
+
+n8n
+
+↓
+
+Backend
+
+↓
+
+Execution Status
+
+↓
+
+Logs
 
 ↓
 
 Frontend
 
-AI must never write directly to the database.
+Database Models
 
----
+User
 
-# n8n Architecture
+Workspace
 
-Backend creates workflow.
+WorkflowTemplate
 
-↓
+WorkflowExecution
 
-n8n executes workflow.
+WorkflowVariable
 
-↓
+WorkflowVersion
 
-Workflow calls backend.
+Webhook
 
-↓
+CredentialReference
 
-Backend updates database.
+ExecutionLog
 
-n8n should never modify business entities directly.
+AuditLog
 
----
+Role
 
-# Development Phases
+Permission
 
-Phase 1 – Foundation
+API
 
-Goal
+/auth
 
-Running backend, frontend, authentication and database.
+/workflows
 
-Exit
+/templates
 
-User can securely log in.
+/executions
 
+/logs
 
+/history
 
-Phase 2 – Core Backend
+/settings
 
-Goal
+/webhooks
 
-Complete backend architecture.
+Development Order
+Phase 1
 
-Includes
+Foundation
 
-Models
+Authentication
 
-Schemas
-
-Services
-
-CRUD
-
-Validation
-
-Exit
-
-All backend APIs functional.
-
-
-
-Phase 3 – Integration Engine
-
-Goal
-
-Universal connector architecture.
-
-Includes
-
-Registry
-
-Runtime
-
-Connector interfaces
-
-OAuth framework
-
-Connector templates
-
-Meta reference connector
-
-Exit
-
-One platform connects successfully.
-
-
-
-Phase 4 – Platform Management
-
-Goal
-
-Manage every connected platform.
-
-Includes
-
-Connect
-
-Disconnect
-
-Refresh tokens
-
-Sync
-
-Platform health
-
-Account management
-
-Exit
-
-Multiple platforms managed from dashboard.
-
-
-
-Phase 5 – Content Management
-
-Goal
-
-Manage content.
-
-Includes
-
-Posts
-
-Drafts
-
-Media
-
-Scheduling
-
-Publishing
-
-Calendar
-
-Exit
-
-Posts can be created, scheduled and published.
-
-
-
-Phase 6 – Engagement
-
-Goal
-
-Manage communication.
-
-Includes
-
-Inbox
-
-Messages
-
-Comments
-
-Replies
-
-Notifications
-
-Exit
-
-Unified inbox fully operational.
-
-
-
-Phase 7 – Workspace
-
-Goal
-
-Manage system configuration.
-
-Includes
-
-Settings
+Database
 
 Users
 
-Roles
+Settings
 
-Permissions
+Environment
 
-Media Library
+Phase 2
 
-Exit
+Workflow Management
 
-System fully configurable.
+CRUD
 
+Import
 
+Export
 
-Phase 8 – Production
+Execute
 
-Goal
+Stop
 
-Production readiness.
+Retry
 
-Includes
+Clone
 
-Logging
+Version
 
-Caching
+Phase 3
 
-Background jobs
+Variables
 
-Performance
+Forms
 
-Testing
+Input Validation
 
-Security
+Schema Builder
 
-Exit
+Secrets
 
-Production deployment ready.
+Phase 4
 
+Execution Engine
 
+Execution Queue
 
-Phase 9 – Automation
+Status
 
-Goal
+History
 
-Workflow execution.
+Logs
 
-Includes
+Retry
 
-n8n
+Phase 5
 
-Workflows
+Scheduling
 
-Triggers
+Cron
 
-Callbacks
+Timers
 
-Exit
+Recurring Jobs
 
-Automations execute correctly.
+Delayed Execution
 
+Phase 6
 
+Monitoring
 
-Phase 10 – Analytics
+Dashboard
 
-Goal
+Statistics
 
-Reporting.
+Alerts
 
-Includes
+Notifications
 
-KPIs
+Phase 7
 
-Charts
+Marketplace
 
-Reports
+Workflow Templates
 
-Exit
+Import
 
-Analytics dashboard operational.
+Export
 
+Sharing
 
+Categories
 
-Phase 11 – AI
+Phase 8
 
-Goal
+AI
 
-Assistance.
+Workflow Generation
 
-Includes
+Prompt to Workflow
 
-Captions
+Workflow Optimization
 
-Replies
+Suggestions
 
-Summaries
+Documentation Generation
 
-Recommendations
+Coding Rules
 
-Exit
+✓ No platform logic
 
-AI assists throughout the dashboard.
+✓ No Meta SDK
 
-# Coding Rules
+✓ No LinkedIn SDK
 
-- API only handles HTTP.
-- Services contain business logic.
-- Models only define data.
-- Integrations communicate with external APIs.
-- n8n executes workflows only.
-- AI only provides assistance.
-- Frontend never contains business logic.
-- Never duplicate logic.
-- Everything must remain platform-independent.
+✓ No OAuth for external services
 
----
+✓ No platform connectors
 
-Implementation Workflow
+✓ Everything through n8n
 
-Every development phase must follow:
+✓ Thin backend
 
-Audit
+✓ Stateless APIs
 
-↓
+✓ Reusable workflow execution
 
-implementation_status.md
+✓ Every feature must be configurable
 
-↓
+✓ Never hardcode workflow IDs
 
-Implementation
+✓ Workflow IDs must come from templates
 
-↓
+Definition of Done
 
-current-progress.md
+A feature is complete only if:
 
-↓
-
-project_checklist.md
-
-↓
-
-Manual Verification
-
-↓
-
-Next Phase
-
-Never skip verification.
-
-Never mark work complete unless implemented.
-
-Never continue to the next phase until exit criteria are satisfied.
-
-# Definition of Done
-
-A feature is complete only when:
-
-- Code implemented
-- Tested
-- API documented
-- UI connected
-- Error handling added
-- Logging added
-- Unit tests written
-- Integrated with the dashboard
-- Checklist updated
-- Documentation updated
-
----
-
-# Current Milestone
-Milestone A
-
-Complete Social Media Operating System
-
-Target
-
-Users should be able to manage every supported platform completely from this dashboard.
-
-Everything except Automation, AI and Analytics.
-
-
-
-Milestone B
-
-Automation Layer
-
-Target
-
-n8n executes workflows using backend APIs.
-
-
-
-Milestone C
-
-Intelligence Layer
-
-Target
-
-Analytics and AI assist users without replacing manual control.
+Backend implemented
+Frontend connected
+n8n workflow tested
+Execution logged
+Retry supported
+Errors handled
+Documentation updated
+Manual verification completed

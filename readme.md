@@ -1,717 +1,222 @@
-# Social Media Operating System (SMOS)
+# Automation Operating System (AOS)
 
-> A universal social media management dashboard built with FastAPI, Next.js and n8n.
+## Vision
 
----
+Automation Operating System (AOS) is a web application that provides a clean user interface for creating, managing and executing automations powered entirely by n8n.
 
-# Vision
+Unlike traditional automation tools, AOS does not implement integrations directly.
 
-SMOS is an internal platform that allows a team to manage multiple social media platforms from a single dashboard.
+Every integration is delegated to n8n.
 
-Instead of opening Instagram, Facebook, LinkedIn, YouTube or other platforms separately, every operation should be possible directly from this dashboard.
+The backend only manages:
 
-The dashboard should become the single place for:
+• Authentication
+• Users
+• Workspaces
+• Workflow execution
+• Workflow templates
+• Variables
+• Credentials
+• Logs
+• Execution history
+• Permissions
 
-- Connecting accounts
-- Publishing content
-- Managing comments
-- Replying to inbox messages
-- Running automations
-- Viewing analytics
-- AI assisted content creation
+Every external service such as:
 
-n8n is used only as the automation engine.
+• Meta
+• LinkedIn
+• Slack
+• Discord
+• GitHub
+• Gmail
+• Sentry
+• Notion
+• Google Drive
+• Stripe
+• Shopify
+• WhatsApp
 
-The dashboard controls everything.
+is accessed only through n8n.
 
----
-
-# Design Goals
-
-- Universal
-- Platform Independent
-- Simple
-- Fast
-- Modular
-- Easy to Extend
-- Internal Tool
-- AI Ready
-
----
-
-# Technology Stack
-
-## Backend
-
-- Python
-- FastAPI
-- SQLAlchemy / SQLModel
-- PostgreSQL
-
-## Frontend
-
-- Next.js
-- React
-- TypeScript
-- Tailwind CSS
-
-## Automation
-
-- n8n
-
-## AI
-
-- OpenAI
-- Gemini
+No platform-specific logic exists inside this repository.
 
 ---
 
-# Project Structure
+## Core Philosophy
 
-```
-n8n-dashboard/
+Backend owns business logic.
 
-backend/
-frontend/
-n8n/
-docs/
+n8n owns integrations.
 
-README.md
-```
+Frontend owns UI.
 
 ---
 
-# Backend
+## Architecture
 
-Responsible for
-
-- API
-- Authentication
-- Database
-- Business Logic
-- Integrations
-- AI
-- n8n
-- Analytics
-
-```
-backend/
-
-app/
-
-api/
-
-auth/
-
-database/
-
-models/
-
-services/
-
-integrations/
-
-n8n/
-
-ai/
-
-utils/
-
-main.py
-```
-
----
-
-# Frontend
-
-Responsible for
-
-- Dashboard
-- UI
-- User Interaction
-
-```
-frontend/
-
-app/
-
-components/
-
-hooks/
-
-services/
-
-utils/
-
-types/
-
-public/
-```
-
----
-
-# n8n
-
-Responsible for
-
-- Workflow Storage
-- Automation Execution
-- Workflow Templates
-
-```
-n8n/
-
-workflows/
-
-templates/
-
-exports/
-
-logs/
-```
-
----
-
-# Documentation
-
-```
-docs/
-
-architecture/
-
-api/
-
-database/
-
-integrations/
-```
-
----
-
-# Folder Responsibilities
-
----
-
-# api/
-
-Contains all API endpoints.
-
-Examples
-
-```
-/auth
-
-/accounts
-
-/posts
-
-/messages
-
-/comments
-
-/analytics
-
-/automation
-
-/settings
-
-/webhooks
-```
-
-Status
-
-```
-[ ]
-```
-
----
-
-# auth/
-
-Responsible for
-
-- Login
-- JWT
-- OAuth
-- Sessions
-
-Status
-
-```
-[ ]
-```
-
----
-
-# database/
-
-Responsible for
-
-- Database Connection
-- ORM
-- Sessions
-- Base Model
-
-Status
-
-```
-[ ]
-```
-
----
-
-# models/
-
-Contains database models.
-
-Current Models
-
-- User
-- Account
-- Post
-- Message
-- Comment
-- Automation
-- Analytics
-- Variable
-- Integration
-
-Status
-
-```
-[ ]
-```
-
----
-
-# services/
-
-Contains business logic.
-
-Examples
-
-- Account Service
-- Post Service
-- Message Service
-- Analytics Service
-- Automation Service
-
-Status
-
-```
-[ ]
-```
-
----
-
-# integrations/
-
-Responsible for connecting every platform.
-
-Everything should be configurable.
-
-No platform-specific business logic should exist outside this module.
-
-Structure
-
-```
-integrations/
-
-engine/
-
-registry/
-
-runtime/
-
-templates/
-
-validators/
-```
-
-Status
-
-```
-[ ]
-```
-
----
-
-# integrations/engine/
-
-Core engine.
-
-Responsible for
-
-- OAuth
-- HTTP Requests
-- Token Refresh
-- API Calls
-- Media Upload
-- Webhooks
-- Response Mapping
-
-Status
-
-```
-[ ]
-```
-
----
-
-# integrations/registry/
-
-Keeps track of
-
-- Installed Integrations
-- Available Integrations
-- Capabilities
-
-Status
-
-```
-[ ]
-```
-
----
-
-# integrations/runtime/
-
-Responsible for
-
-- Loading Integrations
-- Executing Requests
-- Parsing Responses
-
-Status
-
-```
-[ ]
-```
-
----
-
-# integrations/templates/
-
-Contains JSON templates.
-
-Examples
-
-- Meta
-- LinkedIn
-- Twitter
-- YouTube
-- Blank Connector
-
-Status
-
-```
-[ ]
-```
-
----
-
-# integrations/validators/
-
-Responsible for
-
-- OAuth Validation
-- API Validation
-- Mapping Validation
-
-Status
-
-```
-[ ]
-```
-
----
-
-# n8n/
-
-Responsible for
-
-- Deploy Workflows
-- Execute Workflows
-- Workflow Logs
-- Execution Status
-
-Status
-
-```
-[ ]
-```
-
----
-
-# ai/
-
-Responsible for
-
-- Caption Generation
-- Reply Generation
-- Summaries
-
-Status
-
-```
-[ ]
-```
-
----
-
-# utils/
-
-Contains shared helper functions.
-
-Status
-
-```
-[ ]
-```
-
----
-
-# Dashboard Features
-
-## Dashboard
-
-Shows
-
-- Connected Accounts
-- Recent Posts
-- Scheduled Posts
-- Running Automations
-- Notifications
-- Analytics Overview
-
----
-
-## Accounts
-
-Responsible for
-
-- Connect Account
-- Disconnect Account
-- Sync Account
-- Account Health
-
----
-
-## Posts
-
-Responsible for
-
-- Create Post
-- Edit Post
-- Delete Post
-- Schedule Post
-- Publish Post
-
----
-
-## Inbox
-
-Responsible for
-
-- Messages
-- Conversations
-- Replies
-
----
-
-## Comments
-
-Responsible for
-
-- View Comments
-- Reply
-- Hide
-- Delete
-
----
-
-## Automation
-
-Responsible for
-
-- Execute Workflow
-- Enable Workflow
-- Disable Workflow
-- Logs
-
----
-
-## Analytics
-
-Responsible for
-
-- Followers
-- Reach
-- Engagement
-- Views
-- CTR
-- Growth
-
----
-
-## Settings
-
-Responsible for
-
-- Integrations
-- API Keys
-- Users
-- General Settings
-
----
-
-# Database Models
-
-```
 User
 
-Integration
+↓
 
-Account
+Next.js
 
-Post
+↓
 
-Message
+FastAPI
 
-Comment
+↓
+
+Workflow Service
+
+↓
+
+n8n REST API
+
+↓
+
+n8n Workflow
+
+↓
+
+External Services
+
+---
+
+## Features
+
+✓ Authentication
+
+✓ Workspace Management
+
+✓ Workflow Library
+
+✓ Workflow Templates
+
+✓ Variables
+
+✓ Credentials
+
+✓ Executions
+
+✓ Logs
+
+✓ Versioning
+
+✓ Scheduling
+
+✓ Webhooks
+
+✓ AI Assisted Workflow Builder (Future)
+
+---
+
+## Technology
+
+Frontend
+
+Next.js
+React
+TypeScript
+Tailwind
+
+Backend
+
+FastAPI
+Python
+PostgreSQL
+SQLModel
 
 Automation
 
-Variable
-
-Analytics
-```
+n8n Cloud
 
 ---
 
-# Future Integrations
+## Folder Structure
 
-The system should support
+frontend/
 
-- Instagram
-- Facebook
-- Threads
-- LinkedIn
-- WhatsApp
-- Twitter / X
-- YouTube
-- TikTok
-- Pinterest
-- Reddit
-- Discord
-- Snapchat
+backend/
 
-without changing the dashboard.
+docs/
+
+n8n/
+
+scripts/
 
 ---
 
-# Development Roadmap
+## Environment Variables
 
-## Phase 1
+N8N_BASE_URL
 
+N8N_API_KEY
+
+DATABASE_URL
+
+JWT_SECRET
+
+OPENAI_API_KEY (optional)
+
+---
+
+## Development
+
+Install
+
+Run Backend
+
+Run Frontend
+
+Configure n8n
+
+Import templates
+
+Start development
+
+---
+
+## Development Rules
+
+Never implement Meta APIs.
+
+Never implement OAuth for third-party platforms.
+
+Never call third-party APIs directly.
+
+Everything must go through n8n.
+
+Never duplicate workflow logic.
+
+Keep backend platform independent.
+
+---
+
+## Roadmap
+
+Phase 1
 Foundation
 
-```
-[ ] FastAPI
+Phase 2
+Workflow Engine
 
-[ ] Database
+Phase 3
+Template Library
 
-[ ] Authentication
+Phase 4
+Execution Engine
 
-[ ] Frontend Setup
-```
+Phase 5
+Scheduling
 
----
+Phase 6
+Monitoring
 
-## Phase 2
+Phase 7
+Marketplace
 
-Integrations
-
-```
-[ ] Meta
-
-[ ] LinkedIn
-
-[ ] Twitter
-
-[ ] WhatsApp
-```
-
----
-
-## Phase 3
-
-Content
-
-```
-[ ] Posts
-
-[ ] Scheduling
-
-[ ] Publishing
-```
-
----
-
-## Phase 4
-
-Inbox
-
-```
-[ ] Messages
-
-[ ] Comments
-
-[ ] Replies
-```
-
----
-
-## Phase 5
-
-Automation
-
-```
-[ ] n8n
-
-[ ] Workflow Execution
-
-[ ] Logs
-```
-
----
-
-## Phase 6
-
-Analytics
-
-```
-[ ] Dashboard
-
-[ ] Reports
-
-[ ] KPIs
-```
-
----
-
-## Phase 7
-
-AI
-
-```
-[ ] Captions
-
-[ ] Replies
-
-[ ] Summaries
-```
-
+Phase 8
+AI Workflow Generation
 ---
 
 # Project Rules

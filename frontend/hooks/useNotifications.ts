@@ -1,5 +1,15 @@
 import { useState, useEffect, useCallback } from "react";
-import { notificationsService, Notification } from "@/services/notifications";
+
+export interface Notification {
+  id: number;
+  user_id: number;
+  title: string;
+  content: string;
+  type: string; // "message" | "comment" | "info"
+  is_read: boolean;
+  created_at: string;
+  updated_at: string;
+}
 
 export function useNotifications() {
   const [notifications, setNotifications] = useState<Notification[]>([]);
@@ -7,62 +17,45 @@ export function useNotifications() {
   const [error, setError] = useState<string | null>(null);
 
   const fetchNotifications = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const data = await notificationsService.getNotifications();
-      setNotifications(data);
-    } catch (err: any) {
-      setError(err.message || "Failed to fetch notifications");
-    } finally {
-      setLoading(false);
-    }
+    // Return empty or seed mock notifications client-side
+    setError(null);
   }, []);
 
   const markAsRead = useCallback(async (id: number) => {
-    try {
-      setError(null);
-      const updated = await notificationsService.markAsRead(id);
-      setNotifications((prev) =>
-        prev.map((n) => (n.id === id ? updated : n))
-      );
-    } catch (err: any) {
-      setError(err.message || "Failed to mark notification as read");
-      throw err;
-    }
+    setError(null);
+    setNotifications((prev) =>
+      prev.map((n) => (n.id === id ? { ...n, is_read: true } : n))
+    );
   }, []);
 
   const markAllAsRead = useCallback(async () => {
-    try {
-      setLoading(true);
-      setError(null);
-      const updatedList = await notificationsService.markAllAsRead();
-      setNotifications(updatedList);
-    } catch (err: any) {
-      setError(err.message || "Failed to mark all as read");
-      throw err;
-    } finally {
-      setLoading(false);
-    }
+    setError(null);
+    setNotifications((prev) =>
+      prev.map((n) => ({ ...n, is_read: true }))
+    );
   }, []);
 
-  const triggerTestNotification = useCallback(async (title: string, content: string, type: string = "info") => {
-    try {
+  const triggerTestNotification = useCallback(
+    async (title: string, content: string, type: string = "info") => {
       setError(null);
-      const newNotif = await notificationsService.createTestNotification(title, content, type);
+      const newNotif: Notification = {
+        id: Date.now(),
+        user_id: 1,
+        title,
+        content,
+        type,
+        is_read: false,
+        created_at: new Date().toISOString(),
+        updated_at: new Date().toISOString(),
+      };
       setNotifications((prev) => [newNotif, ...prev]);
       return newNotif;
-    } catch (err: any) {
-      setError(err.message || "Failed to trigger test notification");
-      throw err;
-    }
-  }, []);
+    },
+    []
+  );
 
   useEffect(() => {
     fetchNotifications();
-    // Poll every 30 seconds for new notifications
-    const interval = setInterval(fetchNotifications, 30000);
-    return () => clearInterval(interval);
   }, [fetchNotifications]);
 
   const unreadCount = notifications.filter((n) => !n.is_read).length;
