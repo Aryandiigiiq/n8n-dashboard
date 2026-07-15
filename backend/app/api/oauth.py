@@ -23,16 +23,24 @@ def get_or_create_workspace(db: Session, user_id: int) -> Workspace:
         db.refresh(ws)
     return ws
 
-@router.get("/authorize")
-def authorize_meta():
+@router.get("/instagram/authorize")
+def authorize_instagram():
     client_id = os.getenv("META_APP_ID", "mock-id")
     redirect_uri = os.getenv("META_REDIRECT_URI", "http://localhost:3000/dashboard/accounts")
     scope = "instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement"
-    url = f"https://www.facebook.com/v19.0/dialog/oauth?client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}"
+    url = f"https://www.facebook.com/v19.0/dialog/oauth?client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}&state=instagram"
     return {"url": url}
 
-@router.post("/callback")
-async def callback_meta(
+@router.get("/api/v1/auth/{platform}/connect")
+def connect_platform(platform: str, current_user: User = Depends(get_current_user)):
+    if platform not in ["meta", "linkedin", "tiktok"]:
+        raise HTTPException(status_code=400, detail="Unsupported platform")
+    # Dynamically generate and return OAuth redirect URL based on platform credentials
+
+
+
+@router.post("/instagram/callback")
+async def callback_instagram(
     payload: CallbackPayload,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
@@ -102,3 +110,111 @@ async def callback_meta(
                 return {"status": "success", "connected_account": page.get("name")}
 
         raise HTTPException(status_code=404, detail="No Instagram Business account linked to Pages")
+
+@router.get("/facebook/authorize")
+def authorize_facebook():
+    client_id = os.getenv("META_APP_ID", "mock-id")
+    redirect_uri = os.getenv("META_REDIRECT_URI", "http://localhost:3000/dashboard/accounts")
+    scope = "pages_show_list,pages_read_engagement,pages_manage_posts,publish_video"
+    url = f"https://www.facebook.com/v19.0/dialog/oauth?client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}&state=facebook"
+    return {"url": url}
+
+@router.post("/facebook/callback")
+async def callback_facebook(
+    payload: CallbackPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    client_id = os.getenv("META_APP_ID")
+    client_secret = os.getenv("META_APP_SECRET")
+    redirect_uri = os.getenv("META_REDIRECT_URI")
+
+    async with httpx.AsyncClient() as client:
+        token_res = await client.get(
+            "https://graph.facebook.com/v19.0/oauth/access_token",
+            params={
+                "client_id": client_id,
+                "client_secret": client_secret,
+                "redirect_uri": redirect_uri,
+                "code": payload.code
+            }
+        )
+        if token_res.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch short-lived access token")
+        user_token = token_res.json().get("access_token")
+
+        pages_res = await client.get(
+            "https://graph.facebook.com/v19.0/me/accounts",
+            params={"access_token": user_token}
+        )
+        pages_data = pages_res.json().get("data", [])
+        if not pages_data:
+            raise HTTPException(status_code=404, detail="No linked pages found")
+
+        workspace = get_or_create_workspace(db, current_user.id)
+        page = pages_data[0]
+        cred = CredentialReference(
+            workspace_id=workspace.id,
+            platform="facebook",
+            account_id=page.get("id"),
+            account_name=page.get("name"),
+            page_id=page.get("id"),
+            page_access_token=page.get("access_token"),
+            user_access_token=user_token
+        )
+        db.add(cred)
+        db.commit()
+        return {"status": "success", "connected_account": page.get("name")}
+
+@router.get("/linkedin/authorize")
+def authorize_linkedin():
+    client_id = os.getenv("LINKEDIN_CLIENT_ID", "mock-linkedin-id")
+    redirect_uri = os.getenv("LINKEDIN_REDIRECT_URI", "http://localhost:3000/dashboard/accounts")
+    scope = "w_member_social,r_liteprofile"
+    url = f"https://www.linkedin.com/oauth/v2/authorization?response_type=code&client_id={client_id}&redirect_uri={redirect_uri}&state=linkedin&scope={scope}"
+    return {"url": url}
+
+@router.post("/linkedin/callback")
+async def callback_linkedin(
+    payload: CallbackPayload,
+    db: Session = Depends(get_db),
+    current_user: User = Depends(get_current_user)
+):
+    client_id = os.getenv("LINKEDIN_CLIENT_ID")
+    client_secret = os.getenv("LINKEDIN_CLIENT_SECRET")
+    redirect_uri = os.getenv("LINKEDIN_REDIRECT_URI")
+
+    async with httpx.AsyncClient() as client:
+        token_res = await client.post(
+            "https://www.linkedin.com/oauth/v2/accessToken",
+            data={
+                "grant_type": "authorization_code",
+                "code": payload.code,
+                "redirect_uri": redirect_uri,
+                "client_id": client_id,
+                "client_secret": client_secret
+            }
+        )
+        if token_res.status_code != 200:
+            raise HTTPException(status_code=400, detail="Failed to fetch LinkedIn token")
+        access_token = token_res.json().get("access_token")
+
+        profile_res = await client.get(
+            "https://api.linkedin.com/v2/me",
+            headers={"Authorization": f"Bearer {access_token}"}
+        )
+        profile_data = profile_res.json()
+        account_name = f"{profile_data.get('localizedFirstName', '')} {profile_data.get('localizedLastName', '')}".strip() or "LinkedIn Profile"
+
+        workspace = get_or_create_workspace(db, current_user.id)
+        cred = CredentialReference(
+            workspace_id=workspace.id,
+            platform="linkedin",
+            account_id=profile_data.get("id"),
+            account_name=account_name,
+            page_access_token=access_token,
+            user_access_token=access_token
+        )
+        db.add(cred)
+        db.commit()
+        return {"status": "success", "connected_account": account_name}

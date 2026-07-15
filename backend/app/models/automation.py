@@ -19,6 +19,7 @@ class PostAutomation(Base):
     like_count = Column(Integer, default=0)
     comment_count = Column(Integer, default=0)
     owner_username = Column(String(100), nullable=True)
+    campaign_name = Column(String(100), nullable=True)
     
     n8n_workflow_id = Column(String(100), nullable=True)
     is_active = Column(Boolean, default=False)

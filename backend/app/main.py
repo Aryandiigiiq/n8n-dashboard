@@ -12,7 +12,14 @@ from app.api.automations import router as automations_router
 from app.api.executions import router as executions_router
 from app.api.webhooks import router as webhooks_router
 
+from app.database.session import engine
+from app.database.base import Base
+
+# Automatically create tables in the database if they do not exist
+Base.metadata.create_all(bind=engine)
+
 app = FastAPI(title="AOS Backend", version="0.1.0")
+
 
 app.add_middleware(
     CORSMiddleware,

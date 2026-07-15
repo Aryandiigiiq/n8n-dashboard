@@ -14,8 +14,16 @@ class WorkflowExecution(Base):
     trigger_type = Column(String(50), nullable=False)
     input_payload = Column(JSON, nullable=True)
     output_payload = Column(JSON, nullable=True)
+    node_results = Column(JSON, nullable=True)
+    workflow_version = Column(String(50), nullable=True)
+    execution_duration_ms = Column(Integer, nullable=True)
+    error_logs = Column(String(1000), nullable=True)
+    debug_variables = Column(JSON, nullable=True)
+    platform = Column(String(50), nullable=True)
+    trigger_source = Column(String(100), nullable=True)
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     finished_at = Column(DateTime(timezone=True), nullable=True)
+
 
     workspace = relationship("Workspace", back_populates="executions")
     automation = relationship("PostAutomation", back_populates="executions")

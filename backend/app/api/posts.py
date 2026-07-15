@@ -46,18 +46,30 @@ async def sync_posts(
     if not cred:
         return {"status": "skipped", "message": "No connected accounts to sync. Link accounts in Settings."}
 
+    is_basic_display = cred.page_access_token.startswith("IGAA")
     async with httpx.AsyncClient() as client:
-        media_res = await client.get(
-            f"https://graph.facebook.com/v19.0/{cred.account_id}/media",
-            params={
-                "fields": "id,media_url,permalink,caption,timestamp,like_count,comments_count,media_type",
-                "access_token": cred.page_access_token
-            }
-        )
+        if is_basic_display:
+            media_res = await client.get(
+                "https://graph.instagram.com/me/media",
+                params={
+                    "fields": "id,media_url,permalink,caption,timestamp,media_type",
+                    "access_token": cred.page_access_token
+                }
+            )
+        else:
+            media_res = await client.get(
+                f"https://graph.facebook.com/v19.0/{cred.account_id}/media",
+                params={
+                    "fields": "id,media_url,permalink,caption,timestamp,like_count,comments_count,media_type",
+                    "access_token": cred.page_access_token
+                }
+            )
+            
         if media_res.status_code != 200:
-            raise HTTPException(status_code=400, detail="Failed to retrieve posts from Instagram API")
+            raise HTTPException(status_code=400, detail=f"Failed to retrieve posts: {media_res.text}")
         
         media_data = media_res.json().get("data", [])
+
 
         for media in media_data:
             post_id = media.get("id")
@@ -92,11 +104,24 @@ async def sync_posts(
 
 @router.get("", response_model=List[SyncPostResponse])
 def list_posts(
+    platform: Optional[str] = None,
+    campaign: Optional[str] = None,
+    search: Optional[str] = None,
     db: Session = Depends(get_db),
     current_user: User = Depends(get_current_user)
 ):
+
     workspace = get_or_create_workspace(db, current_user.id)
-    automations = db.query(PostAutomation).filter(PostAutomation.workspace_id == workspace.id).all()
+    query = db.query(PostAutomation).filter(PostAutomation.workspace_id == workspace.id)
+    
+    if platform:
+        query = query.filter(PostAutomation.platform == platform)
+    if campaign:
+        query = query.filter(PostAutomation.campaign_name == campaign)
+    if search:
+        query = query.filter(PostAutomation.post_caption.ilike(f"%{search}%"))
+        
+    automations = query.all()
 
     response_list = []
     for auto in automations:

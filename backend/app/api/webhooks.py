@@ -5,7 +5,7 @@ from app.models.execution import WorkflowExecution
 from app.models.log import ExecutionLog
 from pydantic import BaseModel
 from datetime import datetime
-
+import os
 router = APIRouter(prefix="/webhooks", tags=["Webhooks"])
 
 from typing import Optional, Union
@@ -14,6 +14,16 @@ class WebhookCallbackPayload(BaseModel):
     execution_id: Optional[Union[int, str]] = None
     status: str  # success, failed
     output: dict
+
+@router.get("/api/v1/webhooks/meta")
+def verify_meta_webhook(
+    hub_mode: str = None,
+    hub_challenge: str = None,
+    hub_verify_token: str = None
+):
+    if hub_verify_token != os.getenv("META_VERIFY_TOKEN"):
+        raise HTTPException(status_code=403, detail="Verify token mismatch")
+    return hub_challenge
 
 
 @router.post("/callback")

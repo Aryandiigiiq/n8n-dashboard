@@ -3,12 +3,15 @@ from sqlalchemy.sql import func
 from sqlalchemy.orm import relationship
 from app.database.base import Base
 
+from sqlalchemy.dialects.postgresql import UUID
+
 class Workspace(Base):
     __tablename__ = "workspaces"
 
     id = Column(Integer, primary_key=True, index=True)
     name = Column(String(100), nullable=False)
-    owner_id = Column(Integer, ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+    owner_id = Column(UUID(as_uuid=True), ForeignKey("users.id", ondelete="CASCADE"), nullable=False)
+
     created_at = Column(DateTime(timezone=True), server_default=func.now())
     updated_at = Column(DateTime(timezone=True), server_default=func.now(), onupdate=func.now())
 

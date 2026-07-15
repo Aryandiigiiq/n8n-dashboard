@@ -5,8 +5,10 @@ from dotenv import load_dotenv
 
 # Load env variables before importing anything else
 load_dotenv()
+from uuid import uuid4
 
-from app.database.session import SessionLocal
+from app.database.session import SessionLocal, engine
+from app.database.base import Base
 from app.models.user import User
 from app.models.workspace import Workspace
 from app.models.credential import CredentialReference
@@ -14,7 +16,13 @@ from app.models.automation import PostAutomation
 from app.auth.password import hash_password
 
 def seed(email: str = "aryangoel129@gmail.com", password: str = "MultimanH"):
+    print("Dropping all existing database tables...")
+    Base.metadata.drop_all(bind=engine)
+    print("Recreating database tables...")
+    Base.metadata.create_all(bind=engine)
+
     db = SessionLocal()
+
     try:
         # 1. Seed or update User
         hashed_pwd = hash_password(password)
@@ -49,17 +57,19 @@ def seed(email: str = "aryangoel129@gmail.com", password: str = "MultimanH"):
         # 3. Seed connected Meta Credentials (to allow direct testing/sync simulation)
         cred = db.query(CredentialReference).filter(CredentialReference.workspace_id == ws.id).first()
         if not cred:
-            print("Seeding mock Instagram credentials...")
+            print("Seeding Instagram credentials from environment...")
+            token = os.getenv("META_ACCESS_TOKEN", "mock_page_access_token")
             cred = CredentialReference(
                 workspace_id=ws.id,
                 platform="instagram",
                 account_id="17841401234567890",
                 account_name="aryan_aos_business",
                 page_id="10203040506070",
-                page_access_token="mock_page_access_token",
-                user_access_token="mock_user_access_token",
+                page_access_token=token,
+                user_access_token=token,
                 expires_at=datetime.datetime.now() + datetime.timedelta(days=60)
             )
+
             db.add(cred)
             db.commit()
 
@@ -70,7 +80,7 @@ def seed(email: str = "aryangoel129@gmail.com", password: str = "MultimanH"):
             
             posts_data = [
                 {
-                    "post_id": "ig_post_111",
+                    "post_id": f"ig_post_{uuid4().hex[:8]}",
                     "permalink": "https://instagram.com/p/mock-catalog-post",
                     "platform": "instagram",
                     "post_caption": "Check out our brand new summer collection catalog! Comment 'CATALOG' below to get direct links sent to your inbox. #fashion #summer",
@@ -92,7 +102,7 @@ def seed(email: str = "aryangoel129@gmail.com", password: str = "MultimanH"):
                     }
                 },
                 {
-                    "post_id": "ig_post_222",
+                    "post_id": f"ig_post_{uuid4().hex[:8]}",
                     "permalink": "https://instagram.com/p/mock-discount-post",
                     "platform": "instagram",
                     "post_caption": "Flash Sale! Get 25% off on all courses. Comment 'DISCOUNT' below to receive the code instantly.",
@@ -114,7 +124,7 @@ def seed(email: str = "aryangoel129@gmail.com", password: str = "MultimanH"):
                     }
                 },
                 {
-                    "post_id": "ig_post_333",
+                    "post_id": f"ig_post_{uuid4().hex[:8]}",
                     "permalink": "https://instagram.com/p/mock-support-post",
                     "platform": "instagram",
                     "post_caption": "Have questions about our refund policy or support help? Type 'HELP' below to get connected.",
@@ -156,7 +166,7 @@ def seed(email: str = "aryangoel129@gmail.com", password: str = "MultimanH"):
             db.commit()
             print("Mock post automations seeded successfully!")
 
-        print("💚 Database seeded successfully!")
+        print("Database seeded successfully!")
 
     except Exception as e:
         print(f"Error seeding data: {e}")

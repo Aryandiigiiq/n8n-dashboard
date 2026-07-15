@@ -28,7 +28,7 @@ class AuthService:
             raise HTTPException(status_code=401, detail="Invalid credentials")
 
         # 3. Generate JWT
-        access_token = create_access_token({"id": user.id, "name": user.name})
+        access_token = create_access_token({"id": str(user.id), "name": user.name})
 
         # 4. Return token
         return {"access_token": access_token, "token_type": "bearer"}
