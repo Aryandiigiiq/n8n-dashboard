@@ -9,8 +9,28 @@ from app.models.automation import PostAutomation
 from pydantic import BaseModel
 from typing import Optional, List
 import httpx
+from app.models.social_automation import SocialAutomation
+from pydantic import BaseModel, Field
 
 router = APIRouter(prefix="/posts", tags=["Posts"])
+
+import datetime
+
+class AutomationConfigSchema(BaseModel):
+    platform_name: str
+    automation_enabled: bool
+    match_type: str
+    ignore_case: bool
+    keywords: List[str]
+    reply_enabled: bool
+    dm_enabled: bool
+    reply_template: Optional[str] = ""
+    dm_template: Optional[str] = ""
+    reply_delay: int
+    expires_at: Optional[datetime.datetime] = None
+    campaign_name: Optional[str] = ""
+    updated_by: Optional[str] = None
+
 
 class SyncPostResponse(BaseModel):
     post_id: str
@@ -140,3 +160,39 @@ def list_posts(
             )
         )
     return response_list
+@router.get("/{post_id}/automation")
+def get_post_automation(post_id: str, db: Session = Depends(get_db)):
+    config = db.query(SocialAutomation).filter(SocialAutomation.post_id == post_id).first()
+    if not config:
+        # Return blank defaults if never configured
+        return {
+            "post_id": post_id,
+            "platform_name": "instagram",
+            "automation_enabled": False,
+            "match_type": "contains",
+            "ignore_case": True,
+            "keywords": [],
+            "reply_enabled": True,
+            "dm_enabled": True,
+            "reply_template": "",
+            "dm_template": "",
+            "reply_delay": 0,
+            "expires_at": None,
+            "campaign_name": "",
+            "updated_by": None
+        }
+    return config
+
+@router.post("/{post_id}/automation")
+def save_post_automation(post_id: str, payload: AutomationConfigSchema, db: Session = Depends(get_db)):
+    config = db.query(SocialAutomation).filter(SocialAutomation.post_id == post_id).first()
+    if not config:
+        config = SocialAutomation(post_id=post_id, **payload.dict())
+        db.add(config)
+    else:
+        for key, val in payload.dict().items():
+            setattr(config, key, val)
+    db.commit()
+    db.refresh(config)
+    return config
+
