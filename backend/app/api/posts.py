@@ -42,6 +42,7 @@ class SyncPostResponse(BaseModel):
     comments: Optional[int] = 0
     automation_count: Optional[int] = 0
     is_active: Optional[bool] = False
+    post_thumbnail: Optional[str] = None  # <-- FIXED: Tells FastAPI to let this string pass to the frontend
 
 def get_or_create_workspace(db: Session, user_id: int) -> Workspace:
     ws = db.query(Workspace).filter(Workspace.owner_id == user_id).first()
@@ -58,69 +59,167 @@ async def sync_posts(
     current_user: User = Depends(get_current_user)
 ):
     workspace = get_or_create_workspace(db, current_user.id)
-    cred = db.query(CredentialReference).filter(
-        CredentialReference.workspace_id == workspace.id,
-        CredentialReference.platform == "instagram"
-    ).first()
+    credentials = db.query(CredentialReference).filter(
+        CredentialReference.workspace_id == workspace.id
+    ).all()
 
-    if not cred:
+    if not credentials:
         return {"status": "skipped", "message": "No connected accounts to sync. Link accounts in Settings."}
 
-    is_basic_display = cred.page_access_token.startswith("IGAA")
+    synced_total = 0
+    platforms_synced = []
+
     async with httpx.AsyncClient() as client:
-        if is_basic_display:
-            media_res = await client.get(
-                "https://graph.instagram.com/me/media",
-                params={
-                    "fields": "id,media_url,permalink,caption,timestamp,media_type",
-                    "access_token": cred.page_access_token
-                }
-            )
-        else:
-            media_res = await client.get(
-                f"https://graph.facebook.com/v19.0/{cred.account_id}/media",
-                params={
-                    "fields": "id,media_url,permalink,caption,timestamp,like_count,comments_count,media_type",
-                    "access_token": cred.page_access_token
-                }
-            )
-            
-        if media_res.status_code != 200:
-            raise HTTPException(status_code=400, detail=f"Failed to retrieve posts: {media_res.text}")
-        
-        media_data = media_res.json().get("data", [])
+        for cred in credentials:
+            if cred.platform == "instagram":
+                is_basic_display = cred.page_access_token.startswith("IGAA")
+                if is_basic_display:
+                    media_res = await client.get(
+                        "https://graph.instagram.com/me/media",
+                        params={
+                            "fields": "id,media_url,thumbnail_url,permalink,caption,timestamp,media_type",
+                            "access_token": cred.page_access_token
+                        }
+                    )
+                else:
+                    media_res = await client.get(
+                        f"https://graph.facebook.com/v22.0/{cred.account_id}/media",
+                        params={
+                            "fields": "id,media_url,thumbnail_url,permalink,caption,timestamp,like_count,comments_count,media_type",
+                            "access_token": cred.page_access_token
+                        }
+                    )
+                    
+                if media_res.status_code == 200:
+                    media_data = media_res.json().get("data", [])
+                    for media in media_data:
+                        post_id = media.get("id")
+                        media_type = media.get("media_type")
 
+                        post_thumbnail = (
+                            media.get("thumbnail_url") if media_type == "VIDEO" 
+                            else media.get("media_url")
+                        )
 
-        for media in media_data:
-            post_id = media.get("id")
-            auto = db.query(PostAutomation).filter(
-                PostAutomation.workspace_id == workspace.id,
-                PostAutomation.post_id == post_id
-            ).first()
+                        likes = media.get("like_count")
+                        if likes is None:
+                            if media_type == "CAROUSEL_ALBUM":
+                                insights_url = f"https://graph.facebook.com/v22.0/{post_id}/insights?metric=likes&access_token={cred.page_access_token}"
+                                insights_res = await client.get(insights_url)
+                                if insights_res.status_code == 200:
+                                    insights_data = insights_res.json().get("data", [])
+                                    if insights_data:
+                                        likes = insights_data[0].get("values", [{}])[0].get("value", 0)
 
-            if auto:
-                auto.like_count = media.get("like_count", 0)
-                auto.comment_count = media.get("comments_count", 0)
-                auto.post_caption = media.get("caption", "")
-                auto.post_thumbnail = media.get("media_url", "")
-            else:
-                auto = PostAutomation(
-                    workspace_id=workspace.id,
-                    post_id=post_id,
-                    permalink=media.get("permalink", ""),
-                    platform="instagram",
-                    post_thumbnail=media.get("media_url", ""),
-                    post_caption=media.get("caption", ""),
-                    media_type=media.get("media_type"),
-                    like_count=media.get("like_count", 0),
-                    comment_count=media.get("comments_count", 0),
-                    visual_graph={"nodes": [], "edges": []},
-                    is_active=False
+                        if likes is None:
+                            likes = 0
+
+                        comments = media.get("comments_count", 0)   
+                        
+                        auto = db.query(PostAutomation).filter(
+                            PostAutomation.workspace_id == workspace.id,
+                            PostAutomation.post_id == post_id
+                        ).first()
+
+                        if auto:
+                            auto.like_count = likes
+                            auto.comment_count = comments
+                            auto.post_caption = media.get("caption", "")
+                            auto.post_thumbnail = post_thumbnail
+                            auto.media_type = media_type
+                        else:
+                            auto = PostAutomation(
+                                workspace_id=workspace.id,
+                                post_id=post_id,
+                                permalink=media.get("permalink", ""),
+                                platform="instagram",
+                                post_thumbnail=post_thumbnail,
+                                post_caption=media.get("caption", ""),
+                                media_type=media_type,
+                                like_count=likes,
+                                comment_count=comments,
+                                visual_graph={"nodes": [], "edges": []},
+                                is_active=False
+                            )
+                            db.add(auto)
+                    db.commit()
+                    synced_total += len(media_data)
+                    platforms_synced.append("instagram")
+                else:
+                    raise HTTPException(status_code=400, detail=f"Instagram API Error: {media_res.text}")
+
+            elif cred.platform == "facebook":
+                # Sync Facebook Page Feed
+                feed_res = await client.get(
+                    f"https://graph.facebook.com/v22.0/{cred.account_id}/feed",
+                    params={
+                        "fields": "id,message,permalink_url,created_time,likes.summary(true),comments.summary(true),attachments{media,type}",
+                        "access_token": cred.page_access_token
+                    }
                 )
-                db.add(auto)
-            db.commit()
+                
+                if feed_res.status_code == 200:
+                    feed_data = feed_res.json().get("data", [])
+                    for post in feed_data:
+                        post_id = post.get("id")
+                        caption = post.get("message", "")
+                        permalink = post.get("permalink_url", "")
+                        
+                        # Get likes and comments count from summary
+                        likes = post.get("likes", {}).get("summary", {}).get("total_count", 0)
+                        comments = post.get("comments", {}).get("summary", {}).get("total_count", 0)
+                        
+                        # Parse media attachment if present
+                        attachments = post.get("attachments", {}).get("data", [])
+                        post_thumbnail = None
+                        media_type = "IMAGE"
+                        
+                        if attachments:
+                            att = attachments[0]
+                            post_thumbnail = att.get("media", {}).get("image", {}).get("src")
+                            att_type = att.get("type", "")
+                            if "video" in att_type.lower():
+                                media_type = "VIDEO"
+                            elif "album" in att_type.lower():
+                                media_type = "CAROUSEL_ALBUM"
 
-    return {"status": "success", "synced_count": len(media_data)}
+                        auto = db.query(PostAutomation).filter(
+                            PostAutomation.workspace_id == workspace.id,
+                            PostAutomation.post_id == post_id
+                        ).first()
+
+                        if auto:
+                            auto.like_count = likes
+                            auto.comment_count = comments
+                            auto.post_caption = caption
+                            auto.post_thumbnail = post_thumbnail
+                            auto.media_type = media_type
+                        else:
+                            auto = PostAutomation(
+                                workspace_id=workspace.id,
+                                post_id=post_id,
+                                permalink=permalink,
+                                platform="facebook",
+                                post_thumbnail=post_thumbnail,
+                                post_caption=caption,
+                                media_type=media_type,
+                                like_count=likes,
+                                comment_count=comments,
+                                visual_graph={"nodes": [], "edges": []},
+                                is_active=False
+                            )
+                            db.add(auto)
+                    db.commit()
+                    synced_total += len(feed_data)
+                    platforms_synced.append("facebook")
+                else:
+                    raise HTTPException(status_code=400, detail=f"Facebook API Error: {feed_res.text}")
+
+    return {
+        "status": "success", 
+        "synced_count": synced_total, 
+        "platforms": platforms_synced
+    }
 
 @router.get("", response_model=List[SyncPostResponse])
 def list_posts(
@@ -147,18 +246,19 @@ def list_posts(
     for auto in automations:
         flow_count = 1 if auto.n8n_workflow_id else 0
         response_list.append(
-            SyncPostResponse(
-                post_id=auto.post_id,
-                permalink=auto.permalink,
-                platform=auto.platform,
-                caption=auto.post_caption,
-                media_type=auto.media_type,
-                likes=auto.like_count,
-                comments=auto.comment_count,
-                automation_count=flow_count,
-                is_active=auto.is_active
-            )
+        SyncPostResponse(
+            post_id=auto.post_id,
+            permalink=auto.permalink,
+            platform=auto.platform,
+            caption=auto.post_caption,
+            media_type=auto.media_type,
+            likes=auto.like_count,
+            comments=auto.comment_count,
+            automation_count=flow_count,
+            is_active=auto.is_active,
+            post_thumbnail=auto.post_thumbnail  # <-- FIXED: Links your stored image column to the API return data
         )
+    )
     return response_list
 @router.get("/{post_id}/automation")
 def get_post_automation(post_id: str, db: Session = Depends(get_db)):

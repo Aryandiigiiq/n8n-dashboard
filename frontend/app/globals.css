@@ -1,26 +1,100 @@
-@import "tailwindcss";
+/* ─── DigiIQ Design System Tokens ─────────────────────────────── */
+@import url('https://fonts.googleapis.com/css2?family=Inter:wght@400;500;600;700&family=Plus+Jakarta+Sans:wght@400;500;600;700;800&display=swap');
 
 :root {
-  --background: #ffffff;
-  --foreground: #171717;
+  --color-navy: #070e1d;
+  --color-navy-2: #0a1426;
+  --color-primary: #0872fc;
+  --color-primary-deep: #11489d;
+  --color-accent: #3083ef;
+  --color-white: #ffffff;
+
+  --text-heading: #1a1a2e;
+  --text-body: #6b7280;
+  --text-meta: #9ca3af;
+  --text-on-dark: #ffffff;
+  --text-on-dark-muted: rgba(255, 255, 255, 0.48);
+  --text-on-dark-body: rgba(255, 255, 255, 0.84);
+  --text-on-dark-soft: rgba(233, 235, 248, 0.56);
+
+  --border-hairline: rgba(142, 152, 168, 0.5);
+  --border-card: rgba(142, 152, 168, 0.77);
+  --border-card-light: rgba(102, 110, 122, 0.35);
+  --border-on-dark: rgba(255, 255, 255, 0.18);
+  --divider-light: #f3f4f6;
+  --line-light: rgba(7, 14, 29, 0.06);
+  --line-dark: rgba(255, 255, 255, 0.07);
+
+  --gradient-button: linear-gradient(90deg, #0872fc, #11489d);
+  --gradient-text: linear-gradient(180deg, #4da3ff, #0872fc);
+  --gradient-quote: linear-gradient(90deg, #c084fc, #f87171);
+
+  --glass-bg: rgba(255, 253, 253, 0.62);
+  --glass-bg-ondark: rgba(16, 26, 48, 0.45);
+  --glass-border: rgba(0, 0, 0, 0.09);
+  --glass-border-ondark: rgba(255, 255, 255, 0.12);
+  --glass-blur: 16px;
+  --glass-saturate: 1.5;
+  --glass-filter: blur(16px) saturate(1.5);
+
+  --shadow-card: 0 4px 18px rgba(7, 14, 29, 0.1);
+  --shadow-glass: 0 4px 18px rgba(0, 0, 0, 0.28);
+  --shadow-btn-hover: 0 10px 24px rgba(8, 114, 252, 0.35);
+
+  --radius-sm: 5px;
+  --radius-md: 13px;
+  --radius-btn: 16px;
+  --radius-card: 18px;
+  --radius-lg: 25px;
+  --radius-pill: 30px;
+  --radius-footer: 36px;
+
+  /* Typography */
+  --font-display: 'Plus Jakarta Sans', 'Helvetica Neue', Arial, sans-serif;
+  --font-text:    'Inter', 'Helvetica Neue', Arial, sans-serif;
+
+  --text--1: clamp(0.78rem, 0.76rem + 0.09vw, 0.84rem);
+  --text-0: clamp(0.95rem, 0.91rem + 0.18vw, 1.075rem);
+  --text-1: clamp(1.05rem, 0.99rem + 0.27vw, 1.24rem);
+  --text-2: clamp(1.12rem, 1.06rem + 0.28vw, 1.32rem);
+  --text-3: clamp(1.25rem, 1.16rem + 0.45vw, 1.56rem);
+  --text-4: clamp(1.9rem, 1.59rem + 1.57vw, 3rem);
+  --text-5: clamp(2.5rem, 2.01rem + 2.43vw, 4.2rem);
+  --text-6: clamp(3.4rem, 2.66rem + 3.71vw, 6rem);
+
+  --space-1: 4px;
+  --space-2: 8px;
+  --space-3: 14px;
+  --space-4: 20px;
+  --space-5: 28px;
+  --space-6: 40px;
+  --space-7: 64px;
+  --space-8: 96px;
+  --gutter: clamp(20px, 4vw, 80px);
+
+  --duration-fast: 0.25s;
+  --duration-base: 0.45s;
+  --duration-slow: 0.7s;
+  --ease-out: cubic-bezier(0.22, 1, 0.36, 1);
+  --ease-draw: cubic-bezier(0.85, 0, 0, 1);
+  --ease-glass: cubic-bezier(0.165, 0.84, 0.44, 1);
 }
 
-@theme inline {
-  --color-background: var(--background);
-  --color-foreground: var(--foreground);
-  --font-sans: var(--font-geist-sans);
-  --font-mono: var(--font-geist-mono);
+/* ─── Base Reset ───────────────────────────────────────────────── */
+*, *::before, *::after {
+  box-sizing: border-box;
+  margin: 0;
+  padding: 0;
 }
 
-@media (prefers-color-scheme: dark) {
-  :root {
-    --background: #0a0a0a;
-    --foreground: #ededed;
-  }
+html, body {
+  height: 100%;
 }
 
 body {
-  background: var(--background);
-  color: var(--foreground);
-  font-family: Arial, Helvetica, sans-serif;
+  font-family: var(--font-text), 'Helvetica Neue', Arial, sans-serif;
+  background: #ffffff;
+  color: var(--text-heading);
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }

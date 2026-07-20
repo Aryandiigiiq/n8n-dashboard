@@ -14,7 +14,7 @@ async def sync_platform_metrics():
             for cred in credentials:
                 if cred.platform == "instagram":
                     res = await client.get(
-                        f"https://graph.facebook.com/v19.0/{cred.account_id}/media",
+                        f"https://graph.facebook.com/v22.0/{cred.account_id}/media",
                         params={
                             "fields": "id,like_count,comments_count",
                             "access_token": cred.page_access_token
@@ -30,6 +30,25 @@ async def sync_platform_metrics():
                             if post:
                                 post.like_count = media.get("like_count", 0)
                                 post.comment_count = media.get("comments_count", 0)
+                        db.commit()
+                elif cred.platform == "facebook":
+                    res = await client.get(
+                        f"https://graph.facebook.com/v22.0/{cred.account_id}/feed",
+                        params={
+                            "fields": "id,likes.summary(true),comments.summary(true)",
+                            "access_token": cred.page_access_token
+                        }
+                    )
+                    if res.status_code == 200:
+                        feed_data = res.json().get("data", [])
+                        for post_data in feed_data:
+                            post = db.query(PostAutomation).filter(
+                                PostAutomation.post_id == post_data.get("id"),
+                                PostAutomation.workspace_id == cred.workspace_id
+                            ).first()
+                            if post:
+                                post.like_count = post_data.get("likes", {}).get("summary", {}).get("total_count", 0)
+                                post.comment_count = post_data.get("comments", {}).get("summary", {}).get("total_count", 0)
                         db.commit()
     except Exception as e:
         print(f"Error syncing background metrics: {e}")

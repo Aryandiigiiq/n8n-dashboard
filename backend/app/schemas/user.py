@@ -1,6 +1,7 @@
 from pydantic import BaseModel
 from pydantic import ConfigDict
 from datetime import datetime
+from uuid import UUID
 
 
 class UserCreate(BaseModel):
@@ -14,7 +15,7 @@ class UserCreate(BaseModel):
 
 class UserResponse(BaseModel):
 
-    id: int
+    id: UUID
 
     name: str
 
@@ -29,7 +30,7 @@ class UserResponse(BaseModel):
 
 class UserMeResponse(BaseModel):
 
-    id: int
+    id: UUID
 
     name: str
 

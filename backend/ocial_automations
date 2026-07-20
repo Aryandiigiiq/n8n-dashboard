@@ -1,0 +1,5 @@
+ id | platform_name |     post_id      | automation_enabled |    keywords    | match_type | ignore_case | reply_enabled | dm_enabled | reply_template | dm_template | reply_delay | expires_at | campaign_name | created_by | updated_by |          updated_at           
+----+---------------+------------------+--------------------+----------------+------------+-------------+---------------+------------+----------------+-------------+-------------+------------+---------------+------------+------------+-------------------------------
+  1 | instagram     | ig_post_8d1afaa9 | t                  | ["csccs.scca"] | contains   | t           | t             | t          | aszx cv        | sacdfvg     |           0 |            |               |            |            | 2026-07-16 03:48:58.446245+00
+(1 row)
+

@@ -6,7 +6,7 @@ from sqlalchemy.orm import Session
 from fastapi import Depends
 engine = create_engine(
     DATABASE_URL,
-    echo=True
+    echo=False
 )
 
 SessionLocal = sessionmaker(

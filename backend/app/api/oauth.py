@@ -27,8 +27,8 @@ def get_or_create_workspace(db: Session, user_id: int) -> Workspace:
 def authorize_instagram():
     client_id = os.getenv("META_APP_ID", "mock-id")
     redirect_uri = os.getenv("META_REDIRECT_URI", "http://localhost:3000/dashboard/accounts")
-    scope = "instagram_basic,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement"
-    url = f"https://www.facebook.com/v19.0/dialog/oauth?client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}&state=instagram"
+    scope = "instagram_basic,instagram_manage_insights,instagram_manage_comments,instagram_manage_messages,pages_show_list,pages_read_engagement"
+    url = f"https://www.facebook.com/v22.0/dialog/oauth?client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}&state=instagram"
     return {"url": url}
 
 @router.get("/api/v1/auth/{platform}/connect")
@@ -51,7 +51,7 @@ async def callback_instagram(
 
     async with httpx.AsyncClient() as client:
         token_res = await client.get(
-            "https://graph.facebook.com/v19.0/oauth/access_token",
+            "https://graph.facebook.com/v22.0/oauth/access_token",
             params={
                 "client_id": client_id,
                 "client_secret": client_secret,
@@ -64,7 +64,7 @@ async def callback_instagram(
         user_token = token_res.json().get("access_token")
 
         long_res = await client.get(
-            "https://graph.facebook.com/v19.0/oauth/access_token",
+            "https://graph.facebook.com/v22.0/oauth/access_token",
             params={
                 "grant_type": "fb_exchange_token",
                 "client_id": client_id,
@@ -77,7 +77,7 @@ async def callback_instagram(
         long_user_token = long_res.json().get("access_token")
 
         pages_res = await client.get(
-            "https://graph.facebook.com/v19.0/me/accounts",
+            "https://graph.facebook.com/v22.0/me/accounts",
             params={"access_token": long_user_token}
         )
         pages_data = pages_res.json().get("data", [])
@@ -91,7 +91,7 @@ async def callback_instagram(
             page_token = page.get("access_token")
 
             ig_res = await client.get(
-                f"https://graph.facebook.com/v19.0/{page_id}",
+                f"https://graph.facebook.com/v22.0/{page_id}",
                 params={"fields": "instagram_business_account", "access_token": page_token}
             )
             ig_account = ig_res.json().get("instagram_business_account")
@@ -116,7 +116,7 @@ def authorize_facebook():
     client_id = os.getenv("META_APP_ID", "mock-id")
     redirect_uri = os.getenv("META_REDIRECT_URI", "http://localhost:3000/dashboard/accounts")
     scope = "pages_show_list,pages_read_engagement,pages_manage_posts,publish_video"
-    url = f"https://www.facebook.com/v19.0/dialog/oauth?client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}&state=facebook"
+    url = f"https://www.facebook.com/v22.0/dialog/oauth?client_id={client_id}&redirect_uri={redirect_uri}&scope={scope}&state=facebook"
     return {"url": url}
 
 @router.post("/facebook/callback")
@@ -131,7 +131,7 @@ async def callback_facebook(
 
     async with httpx.AsyncClient() as client:
         token_res = await client.get(
-            "https://graph.facebook.com/v19.0/oauth/access_token",
+            "https://graph.facebook.com/v22.0/oauth/access_token",
             params={
                 "client_id": client_id,
                 "client_secret": client_secret,
@@ -144,7 +144,7 @@ async def callback_facebook(
         user_token = token_res.json().get("access_token")
 
         pages_res = await client.get(
-            "https://graph.facebook.com/v19.0/me/accounts",
+            "https://graph.facebook.com/v22.0/me/accounts",
             params={"access_token": user_token}
         )
         pages_data = pages_res.json().get("data", [])

@@ -10,10 +10,10 @@ class PostAutomation(Base):
     workspace_id = Column(Integer, ForeignKey("workspaces.id", ondelete="CASCADE"), nullable=False)
     
     post_id = Column(String(100), nullable=False)
-    permalink = Column(String(500), nullable=False)
+    permalink = Column(String(2083), nullable=False)
     platform = Column(String(50), nullable=False)  # instagram, facebook, threads
-    post_thumbnail = Column(String(500), nullable=True)
-    post_caption = Column(String(1000), nullable=True)
+    post_thumbnail = Column(String(2083), nullable=True)
+    post_caption = Column(String(5000), nullable=True)
     media_type = Column(String(50), nullable=True)
     timestamp = Column(DateTime(timezone=True), nullable=True)
     like_count = Column(Integer, default=0)
