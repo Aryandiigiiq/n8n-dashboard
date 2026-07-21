@@ -9,12 +9,34 @@ class WorkflowService:
     @staticmethod
     def get_or_create_user_workspace(db: Session, user_id: int):
         from app.models.workspace import Workspace
+        from app.models.credential import CredentialReference
         ws = db.query(Workspace).filter(Workspace.owner_id == user_id).first()
         if not ws:
             ws = Workspace(name="Default Workspace", owner_id=user_id)
             db.add(ws)
             db.commit()
             db.refresh(ws)
+
+        # Auto-seed default credentials using META_ACCESS_TOKEN if none exist
+        cred = db.query(CredentialReference).filter(
+            CredentialReference.workspace_id == ws.id
+        ).first()
+        if not cred:
+            import os
+            meta_token = os.getenv("META_ACCESS_TOKEN")
+            if meta_token:
+                cred = CredentialReference(
+                    workspace_id=ws.id,
+                    platform="instagram",
+                    account_id="instagram_me",
+                    account_name="Instagram (Auto)",
+                    page_id="instagram_page",
+                    page_access_token=meta_token,
+                    user_access_token=meta_token
+                )
+                db.add(cred)
+                db.commit()
+                db.refresh(ws)
         return ws
 
     @staticmethod

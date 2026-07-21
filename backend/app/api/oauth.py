@@ -21,6 +21,27 @@ def get_or_create_workspace(db: Session, user_id: int) -> Workspace:
         db.add(ws)
         db.commit()
         db.refresh(ws)
+
+    # Auto-seed default credentials using META_ACCESS_TOKEN if none exist
+    cred = db.query(CredentialReference).filter(
+        CredentialReference.workspace_id == ws.id
+    ).first()
+    if not cred:
+        import os
+        meta_token = os.getenv("META_ACCESS_TOKEN")
+        if meta_token:
+            cred = CredentialReference(
+                workspace_id=ws.id,
+                platform="instagram",
+                account_id="instagram_me",
+                account_name="Instagram (Auto)",
+                page_id="instagram_page",
+                page_access_token=meta_token,
+                user_access_token=meta_token
+            )
+            db.add(cred)
+            db.commit()
+            db.refresh(ws)
     return ws
 
 @router.get("/instagram/authorize")
